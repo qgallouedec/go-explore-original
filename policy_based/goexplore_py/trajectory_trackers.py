@@ -7,7 +7,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from collections import defaultdict
-from typing import Dict, Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 
 class TrajectoryTracker:
@@ -18,7 +18,7 @@ class TrajectoryTracker:
         self.cell_trajectory = []
 
     def get_default_goal(self):
-        raise NotImplementedError('TrajectoryTracker needs to implement reset.')
+        raise NotImplementedError("TrajectoryTracker needs to implement reset.")
 
     def reset(self, current_cell, cell_trajectory, final_goal):
         total_actions = 0
@@ -29,7 +29,7 @@ class TrajectoryTracker:
         self.trajectory_index = -1
 
     def step(self, current_cell, final_goal) -> [Any, float, bool]:
-        raise NotImplementedError('TrajectoryTracker needs to implement step.')
+        raise NotImplementedError("TrajectoryTracker needs to implement step.")
 
     def get_steps(self, r_index=0):
         c_index = self.trajectory_index + r_index
@@ -45,7 +45,7 @@ class TrajectoryTracker:
 
 class DummyTrajectoryTracker(TrajectoryTracker):
     def get_default_goal(self):
-        return 'final_goal'
+        return "final_goal"
 
     def reset(self, current_cell, cell_trajectory, final_goal):
         super(DummyTrajectoryTracker, self).reset(current_cell, cell_trajectory, final_goal)
@@ -61,7 +61,7 @@ class RewardOnlyTrajectoryTracker(TrajectoryTracker):
         self.trajectory_cells = set()
 
     def get_default_goal(self):
-        return 'final_goal'
+        return "final_goal"
 
     def reset(self, current_cell, cell_trajectory, final_goal):
         super(RewardOnlyTrajectoryTracker, self).reset(current_cell, cell_trajectory, final_goal)
@@ -90,7 +90,7 @@ class PotentialRewardTrajectoryTracker(TrajectoryTracker):
         return 0.0
 
     def get_default_goal(self):
-        return 'final_goal'
+        return "final_goal"
 
     def reset(self, current_cell, cell_trajectory, final_goal):
         super(PotentialRewardTrajectoryTracker, self).reset(current_cell, cell_trajectory, final_goal)
@@ -98,16 +98,16 @@ class PotentialRewardTrajectoryTracker(TrajectoryTracker):
         for cell, _ in cell_trajectory:
             for i in range(len(super_cell_trajectory)):
                 if cell in super_cell_trajectory[i]:
-                    for j in range(i+1, len(super_cell_trajectory)):
+                    for j in range(i + 1, len(super_cell_trajectory)):
                         super_cell_trajectory[i] |= super_cell_trajectory[j]
-                    del super_cell_trajectory[i+1:]
+                    del super_cell_trajectory[i + 1 :]
                     break
             else:
                 super_cell_trajectory.append({cell})
 
         self.potentials = defaultdict(self.other_cell_potential)
         for i in range(len(super_cell_trajectory)):
-            potential = pow(self.discount, (len(super_cell_trajectory)-1)-i)
+            potential = pow(self.discount, (len(super_cell_trajectory) - 1) - i)
             for cell in super_cell_trajectory[i]:
                 self.potentials[cell] = potential
 
@@ -129,7 +129,7 @@ class SequentialTrajectoryTracker(TrajectoryTracker):
         self.cell_trajectory = None
 
     def get_default_goal(self):
-        return 'sub_goal'
+        return "sub_goal"
 
     def reset(self, current_cell, cell_trajectory, final_goal):
         super(SequentialTrajectoryTracker, self).reset(current_cell, cell_trajectory, final_goal)
@@ -163,7 +163,7 @@ class SoftTrajectoryTracker(TrajectoryTracker):
         self.window_size = 10
 
     def get_default_goal(self):
-        return 'sub_goal'
+        return "sub_goal"
 
     def reset(self, current_cell, cell_trajectory, final_goal):
         super(SoftTrajectoryTracker, self).reset(current_cell, cell_trajectory, final_goal)
@@ -210,7 +210,7 @@ class SparseSoftTrajectoryTracker(TrajectoryTracker):
         self.window_size = window_size
 
     def get_default_goal(self):
-        return 'sub_goal'
+        return "sub_goal"
 
     def reset(self, current_cell, cell_trajectory, final_goal):
         super(SparseSoftTrajectoryTracker, self).reset(current_cell, cell_trajectory, final_goal)
@@ -297,8 +297,8 @@ def get_super_cell_trajectory(cell_trajectory):
                 for j in range(i + 1, len(super_cell_trajectory)):
                     super_cell_trajectory[i] += super_cell_trajectory[j]
                     super_cell_actions += super_cell_actions[j]
-                del super_cell_trajectory[i + 1:]
-                del super_cell_actions[i + 1:]
+                del super_cell_trajectory[i + 1 :]
+                del super_cell_actions[i + 1 :]
                 break
         else:
             super_cell_trajectory.append([cell])
@@ -314,13 +314,14 @@ class SparseTrajectoryTracker(TrajectoryTracker):
     next goal is will be is stochastic from the perspective of the neural network, as it does not "know" whether it is
     in the return state or the exploration state).
     """
+
     def __init__(self, cell_reached):
         super(SparseTrajectoryTracker, self).__init__(cell_reached)
         self.cell_trajectory = []
         self.sub_goal = None
 
     def get_default_goal(self):
-        return 'sub_goal'
+        return "sub_goal"
 
     def reset(self, current_cell, cell_trajectory, final_goal):
         self.trajectory_index = 0
@@ -369,13 +370,14 @@ class SuperCellTrajectoryTracker(TrajectoryTracker):
     know whether there is a future trajectory). This can potentially be resolved by also providing the final goal to
     the network.
     """
+
     def __init__(self, cell_reached):
         super(SuperCellTrajectoryTracker, self).__init__(cell_reached)
         self.super_cell_trajectory = []
         self.sub_goal = None
 
     def get_default_goal(self):
-        return 'final_goal_and_sub_goal'
+        return "final_goal_and_sub_goal"
 
     def reset(self, current_cell, cell_trajectory, final_goal):
         self.trajectory_index = 0
@@ -407,7 +409,7 @@ class SuperCellTrajectoryTracker(TrajectoryTracker):
 
         for i in range(self.trajectory_index, len(self.super_cell_trajectory)):
             if current_cell in self.super_cell_trajectory[i]:
-                self.trajectory_index = i+1
+                self.trajectory_index = i + 1
                 reward = 1
                 sub_goal_reached = True
                 break

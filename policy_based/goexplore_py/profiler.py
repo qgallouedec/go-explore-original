@@ -9,26 +9,25 @@
 import linecache
 
 
-def display_top(snapshot, key_type='traceback', limit=20):
+def display_top(snapshot, key_type="traceback", limit=20):
     top_stats = snapshot.statistics(key_type)
 
     print("Top %s lines" % limit)
     for index, stat in enumerate(top_stats[:limit], 1):
         frame = stat.traceback[0]
         filename = frame.filename
-        print("#%s: %s:%s: %.1f MB"
-              % (index, filename, frame.lineno, stat.size / (1024*1024)))
+        print("#%s: %s:%s: %.1f MB" % (index, filename, frame.lineno, stat.size / (1024 * 1024)))
         line = linecache.getline(frame.filename, frame.lineno).strip()
 
         for frame in stat.traceback.format():
             print(frame)
 
         if line:
-            print('    %s' % line)
+            print("    %s" % line)
 
     other = top_stats[limit:]
     if other:
         size = sum(stat.size for stat in other)
-        print("%s other: %.1f MB" % (len(other), size / (1024*1024)))
+        print("%s other: %.1f MB" % (len(other), size / (1024 * 1024)))
     total = sum(stat.size for stat in top_stats)
-    print("Total allocated size: %.1f MB" % (total / (1024*1024)))
+    print("Total allocated size: %.1f MB" % (total / (1024 * 1024)))

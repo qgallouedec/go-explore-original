@@ -6,19 +6,21 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import warnings as _warnings
 import copy
-from typing import List, Any
-from collections import deque
 import sys
+import warnings as _warnings
+from collections import deque
+from typing import Any, List
 
 try:
-    from dataclasses import dataclass, field as datafield
+    from dataclasses import dataclass
+    from dataclasses import field as datafield
 
     def copyfield(data):
         return datafield(default_factory=lambda: copy.deepcopy(data))
+
 except ModuleNotFoundError:
-    _warnings.warn('dataclasses not found. To get it, use Python 3.7 or pip install dataclasses')
+    _warnings.warn("dataclasses not found. To get it, use Python 3.7 or pip install dataclasses")
 
 
 @dataclass
@@ -30,7 +32,7 @@ class GridDimension:
 @dataclass
 class CellInfoDeterministic:
     #: The score of the last accepted trajectory to this cell
-    score: int = -float('inf')
+    score: int = -float("inf")
     #: Number of trajectories that included this cell
     nb_seen: int = 0
     #: The number of times this cell was chosen as the cell to explore from
@@ -48,7 +50,7 @@ class CellInfoDeterministic:
     #: The number of times this cell was reached when chosen to explore towards
     nb_reached_for_exploration: int = 0
     #: Length of the trajectory
-    trajectory_len: int = float('inf')
+    trajectory_len: int = float("inf")
     #: Saved restore state. In a purely deterministic environment,
     #: this allows us to fast-forward to the end state instead
     #: of replaying.
@@ -123,7 +125,7 @@ class CellInfoStochastic:
 
 @dataclass
 class TrajectoryElement:
-    __slots__ = ['cells', 'action', 'reward', 'done', 'length', 'score', 'restore']
+    __slots__ = ["cells", "action", "reward", "done", "length", "score", "restore"]
     cells: {}
     action: int
     reward: float
@@ -155,7 +157,7 @@ class LogParameters:
     checkpoint_time: int
 
     def should_render(self, name):
-        return name in self.save_pictures or 'all' in self.save_pictures
+        return name in self.save_pictures or "all" in self.save_pictures
 
 
 @dataclass()
@@ -164,7 +166,7 @@ class Weight:
     power: float = 1.0
 
     def __repr__(self):
-        return f'w={self.weight:.2f}=p={self.power:.2f}'
+        return f"w={self.weight:.2f}=p={self.power:.2f}"
 
 
 @dataclass()
@@ -175,4 +177,4 @@ class DirWeights:
     score_high: float = 0.0
 
     def __repr__(self):
-        return f'h={self.horiz:.2f}=v={self.vert:.2f}=l={self.score_low:.2f}=h={self.score_high:.2f}'
+        return f"h={self.horiz:.2f}=v={self.vert:.2f}=l={self.score_low:.2f}=h={self.score_high:.2f}"

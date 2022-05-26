@@ -6,12 +6,13 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import gym
-import numpy as np
-import types
 import copy
 import random
+import types
 from typing import List
+
+import gym
+import numpy as np
 
 
 def make_robot_env(name, will_render=False):
@@ -21,18 +22,19 @@ def make_robot_env(name, will_render=False):
     # mode and 3/ prevent rendering if will_render is not announced (necessary because
     # when will_render is announced, we proactively create a viewer as soon as the
     # env is created, because creating it later causes inaccuracies).
-    def render(self, mode='human'):
-        assert will_render, 'Rendering in an environment with will_render=False'
+    def render(self, mode="human"):
+        assert will_render, "Rendering in an environment with will_render=False"
         self._render_callback()
         self._get_viewer()._hide_overlay = True
-        if mode == 'rgb_array':
+        if mode == "rgb_array":
             self._get_viewer().render()
             import glfw
+
             width, height = glfw.get_window_size(self.viewer.window)
             data = self._get_viewer().read_pixels(width, height, depth=False)
             # original image is upside-down, so flip it
             return data[::-1, :, :]
-        elif mode == 'human':
+        elif mode == "human":
             self._get_viewer().render()
 
     env.unwrapped.render = types.MethodType(render, env.unwrapped)
@@ -42,13 +44,13 @@ def make_robot_env(name, will_render=False):
         # noinspection PyProtectedMember
         env.unwrapped._get_viewer()
 
-    if 'Fetch' in name:
+    if "Fetch" in name:
         # The way _render_callback is implemented in Fetch environments causes issues.
         # This monkey patch fixes them.
         def _render_callback(self):
             # Visualize target.
             sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
-            site_id = self.sim.model.site_name2id('target0')
+            site_id = self.sim.model.site_name2id("target0")
             self.sim.model.site_pos[site_id] = self.goal - sites_offset[0]
 
         env.unwrapped._render_callback = types.MethodType(_render_callback, env.unwrapped)
@@ -57,7 +59,7 @@ def make_robot_env(name, will_render=False):
 
 
 class DomainConditionedPosLevel:
-    __slots__ = ['level', 'score', 'room', 'x', 'y', 'tuple']
+    __slots__ = ["level", "score", "room", "x", "y", "tuple"]
 
     def __init__(self, level=0, score=0, room=0, x=0, y=0):
         self.level = level
@@ -88,7 +90,7 @@ class DomainConditionedPosLevel:
         self.tuple = d
 
     def __repr__(self):
-        return f'Level={self.level} Room={self.room} Objects={self.score} x={self.x} y={self.y}'
+        return f"Level={self.level} Room={self.room} Objects={self.score} x={self.x} y={self.y}"
 
 
 class MyRobot:
@@ -112,7 +114,7 @@ class MyRobot:
         self.achieved_has_moved = False
         self.score_so_far = 0
 
-        self.follow_grip_until_moved = ('FetchPickAndPlace' in env_name and False)
+        self.follow_grip_until_moved = "FetchPickAndPlace" in env_name and False
 
         self.reset()
 
@@ -122,10 +124,11 @@ class MyRobot:
 
     def pos_from_state(self, seed, state):
         if self.follow_grip_until_moved:
-            pos = state['achieved_goal'] if self.achieved_has_moved else state['observation'][:3]
+            pos = state["achieved_goal"] if self.achieved_has_moved else state["observation"][:3]
             return np.array([seed, self.achieved_has_moved] + list(pos / self.interval_size), dtype=np.int32)
-        return np.array([seed, self.score_so_far] +
-                        list((state['achieved_goal'] / self.interval_size).astype(np.int32)), dtype=np.int32)
+        return np.array(
+            [seed, self.score_so_far] + list((state["achieved_goal"] / self.interval_size).astype(np.int32)), dtype=np.int32
+        )
 
     def reset(self) -> List[np.ndarray]:
         self.seed = None
@@ -134,23 +137,25 @@ class MyRobot:
         self.cur_achieved_goal = None
         self.achieved_has_moved = False
         self.score_so_far = 0
-        self.state = [self.pos_from_state(-1, {'achieved_goal': np.array([]), 'observation': np.array([])})]
+        self.state = [self.pos_from_state(-1, {"achieved_goal": np.array([]), "observation": np.array([])})]
         return copy.copy(self.state)
 
     def get_restore(self):
         # noinspection PyProtectedMember
-        return copy.deepcopy((
-            None,
-            self.env._elapsed_steps,
-            self.interval_size,
-            self.cur_achieved_goal,
-            self.achieved_has_moved,
-            self.score_so_far,
-            self.state,
-            self.actual_state,
-            self.trajectory,
-            self.seed,
-        ))
+        return copy.deepcopy(
+            (
+                None,
+                self.env._elapsed_steps,
+                self.interval_size,
+                self.cur_achieved_goal,
+                self.achieved_has_moved,
+                self.score_so_far,
+                self.state,
+                self.actual_state,
+                self.trajectory,
+                self.seed,
+            )
+        )
 
     def restore(self, data):
         (
@@ -169,7 +174,7 @@ class MyRobot:
         self.seed = seed
         for a in trajectory:
             self.step(a)
-        assert np.allclose(self.actual_state['achieved_goal'], actual_state['achieved_goal'])
+        assert np.allclose(self.actual_state["achieved_goal"], actual_state["achieved_goal"])
         return copy.copy(self.state)
 
     def step(self, action):
@@ -187,17 +192,20 @@ class MyRobot:
         self.score_so_far += reward
         self.state = [self.pos_from_state(self.seed, self.actual_state)]
 
-        if (not self.achieved_has_moved and
-                self.cur_achieved_goal is not None and
-                not np.allclose(self.cur_achieved_goal, self.actual_state['achieved_goal'])):
+        if (
+            not self.achieved_has_moved
+            and self.cur_achieved_goal is not None
+            and not np.allclose(self.cur_achieved_goal, self.actual_state["achieved_goal"])
+        ):
             self.achieved_has_moved = True
-        self.cur_achieved_goal = self.actual_state['achieved_goal']
+        self.cur_achieved_goal = self.actual_state["achieved_goal"]
 
         return copy.copy(self.state), reward, done, lol
 
     def get_pos(self):
         return DomainConditionedPosLevel()
 
-    def render_with_known(self, known_positions, resolution, show=True, filename=None, combine_val=max,
-                          get_val=lambda x: x.score, minmax=None):
+    def render_with_known(
+        self, known_positions, resolution, show=True, filename=None, combine_val=max, get_val=lambda x: x.score, minmax=None
+    ):
         pass

@@ -1,9 +1,8 @@
-
 # Copyright (c) 2020 Uber Technologies, Inc.
 
 # Licensed under the Uber Non-Commercial License (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at the root directory of this project. 
+# You may obtain a copy of the License at the root directory of this project.
 
 # See the License for the specific language governing permissions and
 # limitations under the License.
@@ -14,7 +13,7 @@ from .utils import imdownscale
 
 
 class MontezumaPosLevel:
-    __slots__ = ['level', 'score', 'room', 'x', 'y', 'tuple']
+    __slots__ = ["level", "score", "room", "x", "y", "tuple"]
 
     def __init__(self, level, score, room, x, y):
         self.level = level
@@ -44,13 +43,14 @@ class MontezumaPosLevel:
         self.tuple = d
 
     def __repr__(self):
-        return f'Level={self.level} Room={self.room} Objects={self.score} x={self.x} y={self.y}'
+        return f"Level={self.level} Room={self.room} Objects={self.score} x={self.x} y={self.y}"
 
 
 def convert_state(state):
     if MyMontezuma.TARGET_SHAPE is None:
         return None
     import cv2
+
     state = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
     if MyMontezuma.TARGET_SHAPE == (-1, -1):
         return RLEArray(state)
@@ -61,18 +61,10 @@ PYRAMID = [
     [-1, -1, -1, 0, 1, 2, -1, -1, -1],
     [-1, -1, 3, 4, 5, 6, 7, -1, -1],
     [-1, 8, 9, 10, 11, 12, 13, 14, -1],
-    [15, 16, 17, 18, 19, 20, 21, 22, 23]
+    [15, 16, 17, 18, 19, 20, 21, 22, 23],
 ]
 
-OBJECT_PIXELS = [
-    50,  # Hammer/mallet
-    40,  # Key 1
-    40,  # Key 2
-    40,  # Key 3
-    37,  # Sword 1
-    37,  # Sword 2
-    42   # Torch
-]
+OBJECT_PIXELS = [50, 40, 40, 40, 37, 37, 42]  # Hammer/mallet  # Key 1  # Key 2  # Key 3  # Sword 1  # Sword 2  # Torch
 
 KNOWN_XY = [None] * 24
 
@@ -97,9 +89,17 @@ def clip(a, m, M):
 
 
 class MyMontezuma:
-    def __init__(self, check_death: bool = True, unprocessed_state: bool = False, score_objects: bool = False,
-                 x_repeat=2, objects_from_pixels=True, objects_remember_rooms=False, only_keys=False):  # TODO: version that also considers the room objects were found in
-        self.env = gym.make('MontezumaRevengeDeterministic-v4')
+    def __init__(
+        self,
+        check_death: bool = True,
+        unprocessed_state: bool = False,
+        score_objects: bool = False,
+        x_repeat=2,
+        objects_from_pixels=True,
+        objects_remember_rooms=False,
+        only_keys=False,
+    ):  # TODO: version that also considers the room objects were found in
+        self.env = gym.make("MontezumaRevengeDeterministic-v4")
         self.env.reset()
         self.score_objects = score_objects
         self.ram = None
@@ -143,7 +143,7 @@ class MyMontezuma:
     def pos_from_unprocessed_state(self, face_pixels, unprocessed_state):
         face_pixels = [(y, x * self.x_repeat) for y, x in face_pixels]
         if len(face_pixels) == 0:
-            assert self.pos != None, 'No face pixel and no previous pos'
+            assert self.pos != None, "No face pixel and no previous pos"
             return self.pos  # Simply re-use the same position
         y, x = np.mean(face_pixels, axis=0)
         room = 1
@@ -162,9 +162,11 @@ class MyMontezuma:
                     room = 1
                     level += 1
                 else:
-                    assert direction_x == 0 or direction_y == 0, f'Room change in more than two directions : ({direction_y}, {direction_x})'
+                    assert (
+                        direction_x == 0 or direction_y == 0
+                    ), f"Room change in more than two directions : ({direction_y}, {direction_x})"
                     room = PYRAMID[room_y + direction_y][room_x + direction_x]
-                    assert room != -1, f'Impossible room change: ({direction_y}, {direction_x})'
+                    assert room != -1, f"Impossible room change: ({direction_y}, {direction_x})"
 
         score = self.cur_score
         if self.score_objects:  # TODO: detect objects from the frame!
@@ -226,7 +228,7 @@ class MyMontezuma:
             self.room_time,
             self.ram_death_state,
             self.score_objects,
-            self.cur_lives
+            self.cur_lives,
         )
 
     def restore(self, data):
@@ -250,10 +252,10 @@ class MyMontezuma:
         # The screen is a transition screen if it is all black or if its color is made up only of black and
         # (0, 28, 136), which is a color seen in the transition screens between two levels.
         return (
-                       np.sum(unprocessed_state[:, :, 0] == 0) +
-                       np.sum((unprocessed_state[:, :, 1] == 0) | (unprocessed_state[:, :, 1] == 28)) +
-                       np.sum((unprocessed_state[:, :, 2] == 0) | (unprocessed_state[:, :, 2] == 136))
-               ) == unprocessed_state.size
+            np.sum(unprocessed_state[:, :, 0] == 0)
+            + np.sum((unprocessed_state[:, :, 1] == 0) | (unprocessed_state[:, :, 1] == 28))
+            + np.sum((unprocessed_state[:, :, 2] == 0) | (unprocessed_state[:, :, 2] == 136))
+        ) == unprocessed_state.size
 
     def get_face_pixels(self, unprocessed_state):
         return set(zip(*np.where(unprocessed_state[50:, :, 0] == 228)))
@@ -296,21 +298,30 @@ class MyMontezuma:
         # TODO: remove all this stuff
         if self.check_death and pixel_death:
             if not ram_death:
-                print('Image-detected death. Check it!', self.ram[55], self.ram[58])
+                print("Image-detected death. Check it!", self.ram[55], self.ram[58])
                 plt.imshow(unprocessed_state[50:, :, :])
                 print(np.sum(unprocessed_state[51:, :, :] == 0), unprocessed_state[50:].size)
                 plt.show()
                 print(np.where(unprocessed_state[:, :, 0] == 228))
                 plt.imshow(unprocessed_state[:, :, 0] == 228)
                 plt.show()
-                print(Counter(list(zip(unprocessed_state[51:, :, 0].flatten(), unprocessed_state[51:, :, 1].flatten(),
-                                       unprocessed_state[51:, :, 2].flatten()))))
+                print(
+                    Counter(
+                        list(
+                            zip(
+                                unprocessed_state[51:, :, 0].flatten(),
+                                unprocessed_state[51:, :, 1].flatten(),
+                                unprocessed_state[51:, :, 2].flatten(),
+                            )
+                        )
+                    )
+                )
             done = True
         elif self.check_death and not pixel_death and ram_death:
             if self.ram_death_state == -1:
                 self.ram_death_state = self.cur_steps
             if self.cur_steps - self.ram_death_state > 0 and not self.ignore_ram_death:
-                print('OMG, undetected death!!!')
+                print("OMG, undetected death!!!")
                 self.ignore_ram_death = True
                 plt.imshow(unprocessed_state)
                 plt.show()
@@ -318,20 +329,27 @@ class MyMontezuma:
                 plt.show()
                 print(np.where(unprocessed_state[:, :, 0] == 228))
                 print(self.ram)
-                print(Counter(list(zip(unprocessed_state[:, :, 0].flatten(), unprocessed_state[:, :, 1].flatten(),
-                                       unprocessed_state[:, :, 2].flatten()))))
+                print(
+                    Counter(
+                        list(
+                            zip(
+                                unprocessed_state[:, :, 0].flatten(),
+                                unprocessed_state[:, :, 1].flatten(),
+                                unprocessed_state[:, :, 2].flatten(),
+                            )
+                        )
+                    )
+                )
 
         self.cur_score += reward
         self.pos = self.pos_from_unprocessed_state(face_pixels, unprocessed_state)
         if self.pos.room != self.room_time[0]:
             self.room_time = (self.pos.room, 0)
         self.room_time = (self.pos.room, self.room_time[1] + 1)
-        if (self.pos.room not in self.rooms or
-                (self.room_time[1] == self.room_threshold and
-                 not self.rooms[self.pos.room][0])):
+        if self.pos.room not in self.rooms or (self.room_time[1] == self.room_threshold and not self.rooms[self.pos.room][0]):
             self.rooms[self.pos.room] = (
                 self.room_time[1] == self.room_threshold,
-                unprocessed_state[50:].repeat(self.x_repeat, axis=1)
+                unprocessed_state[50:].repeat(self.x_repeat, axis=1),
             )
         if self.unprocessed_state:
             return unprocessed_state, reward, done, lol
@@ -341,8 +359,9 @@ class MyMontezuma:
         assert self.pos is not None
         return self.pos
 
-    def render_with_known(self, known_positions, resolution, show=True, filename=None, combine_val=max,
-                          get_val=lambda x: x.score, minmax=None):
+    def render_with_known(
+        self, known_positions, resolution, show=True, filename=None, combine_val=max, get_val=lambda x: x.score, minmax=None
+    ):
         height, width = list(self.rooms.values())[0][1].shape[:2]
 
         final_image = np.zeros((height * 4, width * 9, 3), dtype=np.uint8) + 255
@@ -366,7 +385,7 @@ class MyMontezuma:
             y_room, x_room = room_pos(room)
             y_room *= height
             x_room *= width
-            final_image[y_room:y_room + height, x_room:x_room + width, :] = img
+            final_image[y_room : y_room + height, x_room : x_room + width, :] = img
 
         plt.figure(figsize=(final_image.shape[1] // 30, final_image.shape[0] // 30))
 
@@ -384,10 +403,20 @@ class MyMontezuma:
 
             cv2.line(final_image, (x_room, y_room), (x_room, y_room + img.shape[0]), (255, 255, 255), 1)
             cv2.line(final_image, (x_room, y_room), (x_room + img.shape[1], y_room), (255, 255, 255), 1)
-            cv2.line(final_image, (x_room + img.shape[1], y_room), (x_room + img.shape[1], y_room + img.shape[0]),
-                     (255, 255, 255), 1)
-            cv2.line(final_image, (x_room, y_room + img.shape[0]), (x_room + img.shape[1], y_room + img.shape[0]),
-                     (255, 255, 255), 1)
+            cv2.line(
+                final_image,
+                (x_room + img.shape[1], y_room),
+                (x_room + img.shape[1], y_room + img.shape[0]),
+                (255, 255, 255),
+                1,
+            )
+            cv2.line(
+                final_image,
+                (x_room, y_room + img.shape[0]),
+                (x_room + img.shape[1], y_room + img.shape[0]),
+                (255, 255, 255),
+                1,
+            )
 
             for k in known_positions:
                 if k.room != room:
@@ -403,21 +432,29 @@ class MyMontezuma:
 
         vals = list(points.values())
         points = list(points.items())
-        plt.scatter([p[0][0] for p in points], [p[0][1] for p in points], c=[p[1] for p in points], cmap='bwr',
-                    s=(resolution) ** 2, marker='*')
+        plt.scatter(
+            [p[0][0] for p in points],
+            [p[0][1] for p in points],
+            c=[p[1] for p in points],
+            cmap="bwr",
+            s=(resolution) ** 2,
+            marker="*",
+        )
         plt.legend()
 
         import matplotlib.cm
         import matplotlib.colors
-        mappable = matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(vmin=np.min(vals), vmax=np.max(vals)),
-                                                cmap='bwr')
+
+        mappable = matplotlib.cm.ScalarMappable(
+            norm=matplotlib.colors.Normalize(vmin=np.min(vals), vmax=np.max(vals)), cmap="bwr"
+        )
         mappable.set_array(vals)
-        matplotlib.rcParams.update({'font.size': 22})
+        matplotlib.rcParams.update({"font.size": 22})
         plt.colorbar(mappable)
 
-        plt.axis('off')
+        plt.axis("off")
         if filename is not None:
-            plt.savefig(filename, bbox_inches='tight')
+            plt.savefig(filename, bbox_inches="tight")
         if show:
             plt.show()
         else:

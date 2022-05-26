@@ -1,9 +1,8 @@
-
 # Copyright (c) 2020 Uber Technologies, Inc.
 
 # Licensed under the Uber Non-Commercial License (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at the root directory of this project. 
+# You may obtain a copy of the License at the root directory of this project.
 
 # See the License for the specific language governing permissions and
 # limitations under the License.
@@ -11,7 +10,7 @@
 
 from goexplore_py.import_ai import *
 
-sns.set_style('whitegrid')
+sns.set_style("whitegrid")
 
 
 def p(x, y, treatment, t_name, treatment_data):
@@ -38,18 +37,18 @@ def plot(xs, ys, treatments, treatment_data, keys_of_interest, keys_of_interest_
                 key = create_key(treatment, keys_of_interest, keys_of_interest_dict)
                 name = create_name(treatment, pretty_names)
                 p(x, y, key, name, treatment_data)
-            plt.title(yname + ' over ' + xname)
+            plt.title(yname + " over " + xname)
             plt.xlabel(xname)
             plt.ylabel(yname)
             plt.legend()
-            plt.savefig(yname + ' over ' + xname + '.png')
+            plt.savefig(yname + " over " + xname + ".png")
             plt.show()
 
 
 def gather_treatments(results_folder, keys_of_interest):
     treatment_dict = {}
-    for folder in tqdm(sorted(glob.glob(results_folder + '/*'))):
-        meta_data = json.load(open(folder + '/kwargs.json'))
+    for folder in tqdm(sorted(glob.glob(results_folder + "/*"))):
+        meta_data = json.load(open(folder + "/kwargs.json"))
         meta_key = []
         for key in keys_of_interest:
             meta_key.append(meta_data[key])
@@ -73,16 +72,17 @@ def collect_data(treatments, treatment_dict, keys_of_interest, keys_of_interest_
             max_score = []
             n_rooms = []
             n_objects = []
-            for f in sorted(glob.glob('%s/*_set.7z' % folder)):
-                data = pickle.load(lzma.open(f, 'rb'))
-                real, compute = f.split('/')[-1].split('_set.')[0].split('_')
+            for f in sorted(glob.glob("%s/*_set.7z" % folder)):
+                data = pickle.load(lzma.open(f, "rb"))
+                real, compute = f.split("/")[-1].split("_set.")[0].split("_")
                 compute_frames.append(int(compute))
                 real_frames.append(int(real))
                 n_found.append(len(data))
                 max_score.append(max(data[e] for e in data))
                 n_rooms.append(len(set((e.level, e.room) for e in data)))
-            all_res.append({'compute': compute_frames, 'real': real_frames, 'found': n_found, 'score': max_score,
-                            'rooms': n_rooms})
+            all_res.append(
+                {"compute": compute_frames, "real": real_frames, "found": n_found, "score": max_score, "rooms": n_rooms}
+            )
         treatment_data[treatment_key] = all_res
     return treatment_data
 

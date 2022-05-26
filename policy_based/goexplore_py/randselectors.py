@@ -6,21 +6,24 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import random
-import logging
 import copy
-import numpy as np
+import logging
+import random
 from collections import defaultdict
-from typing import List, Any, Dict
-from .data_classes import CellInfoStochastic
+from typing import Any, Dict, List
+
+import numpy as np
+
 from .cell_representations import MontezumaPosLevel
+from .data_classes import CellInfoStochastic
+
 logger = logging.getLogger(__name__)
 
 
 def number_of_set_bits(i):
     i = i - ((i >> 1) & 0x55555555)
     i = (i & 0x33333333) + ((i >> 2) & 0x33333333)
-    return (((i + (i >> 4) & 0xF0F0F0F) * 0x1010101) & 0xffffffff) >> 24
+    return (((i + (i >> 4) & 0xF0F0F0F) * 0x1010101) & 0xFFFFFFFF) >> 24
 
 
 class Selector(object):
@@ -28,7 +31,7 @@ class Selector(object):
         pass
 
     def choose_cell_key(self, archive: Dict[Any, CellInfoStochastic], size=1):
-        raise NotImplementedError('Selectors need to implement a choose_cell_key method')
+        raise NotImplementedError("Selectors need to implement a choose_cell_key method")
 
     def choose_cell(self, archive: Dict[Any, CellInfoStochastic], size=1):
         chosen_keys = self.choose_cell_key(archive, size)
@@ -93,7 +96,7 @@ class AbstractWeight:
 
 class MaxScoreCell(AbstractWeight):
     def __init__(self):
-        self.max_score: float = -float('inf')
+        self.max_score: float = -float("inf")
 
     def update_weights(self, archive, update_all):
         max_cell = None
@@ -101,26 +104,26 @@ class MaxScoreCell(AbstractWeight):
             if info.score > self.max_score:
                 self.max_score = info.score
                 max_cell = cell
-        logger.debug(f'max score: {self.max_score} cell: {max_cell}')
+        logger.debug(f"max score: {self.max_score} cell: {max_cell}")
 
     def additive_weight(self, cell_key, cell, known_cells, special_attributes):
-        assert self.max_score != -float('inf'), 'Max score was not initialized!'
+        assert self.max_score != -float("inf"), "Max score was not initialized!"
         if cell.score == self.max_score:
-            logger.debug(f'max cell found: {self.max_score} cell: {cell_key}')
+            logger.debug(f"max cell found: {self.max_score} cell: {cell_key}")
             return 1
         else:
             return 0
 
     def multiplicative_weight(self, cell_key, cell, known_cells, special_attributes):
-        assert self.max_score != -float('inf'), 'Max score was not initialized!'
+        assert self.max_score != -float("inf"), "Max score was not initialized!"
         if cell.score == self.max_score:
-            logger.debug(f'max cell found: {self.max_score} cell: {cell_key}')
+            logger.debug(f"max cell found: {self.max_score} cell: {cell_key}")
             return 1
         else:
             return 0
 
     def __repr__(self):
-        return f'MaxScoreCell()'
+        return f"MaxScoreCell()"
 
 
 class TargetCell(AbstractWeight):
@@ -146,17 +149,17 @@ class TargetCell(AbstractWeight):
             return 0
 
     def __repr__(self):
-        return f'TargetCell()'
+        return f"TargetCell()"
 
 
 class MaxScoreAndDone(AbstractWeight):
     def __init__(self):
-        self.max_score: float = -float('inf')
+        self.max_score: float = -float("inf")
         self.check_done: bool = True
 
     def update_weights(self, archive, update_all):
         max_cell = None
-        alt_max_score = -float('inf')
+        alt_max_score = -float("inf")
         done_cell_exists = False
         self.check_done = True
         for cell, info in archive.items():
@@ -170,39 +173,39 @@ class MaxScoreAndDone(AbstractWeight):
         if not done_cell_exists:
             self.max_score = alt_max_score
             self.check_done = False
-            logger.warning(f'Done cell does not exist in checkpoint, using regular max-score instead.')
-        logger.debug(f'max score: {self.max_score} cell: {max_cell}')
+            logger.warning(f"Done cell does not exist in checkpoint, using regular max-score instead.")
+        logger.debug(f"max score: {self.max_score} cell: {max_cell}")
 
     def additive_weight(self, cell_key, cell, known_cells, special_attributes):
-        assert self.max_score != -float('inf'), 'Max score was not initialized!'
+        assert self.max_score != -float("inf"), "Max score was not initialized!"
         if cell.score == self.max_score and (cell_key.done or not self.check_done):
-            logger.debug(f'max cell found: {self.max_score} cell: {cell_key}')
+            logger.debug(f"max cell found: {self.max_score} cell: {cell_key}")
             return 1
         else:
             return 0
 
     def multiplicative_weight(self, cell_key, cell, known_cells, special_attributes):
-        assert self.max_score != -float('inf'), 'Max score was not initialized!'
+        assert self.max_score != -float("inf"), "Max score was not initialized!"
         if cell.score == self.max_score and (cell_key.done or not self.check_done):
-            logger.debug(f'max cell found: {self.max_score} cell: {cell_key}')
+            logger.debug(f"max cell found: {self.max_score} cell: {cell_key}")
             return 1
         else:
             return 0
 
     def __repr__(self):
-        return f'MaxScoreAndDone()'
+        return f"MaxScoreAndDone()"
 
 
 class ScoreBasedFilter(AbstractWeight):
     def __init__(self):
-        self.min_score: float = -float('inf')
+        self.min_score: float = -float("inf")
         self.roll_threshold: float = 0.5
 
     def update_weights(self, archive, update_all):
         scores = [info.score for cell, info in archive.items()]
         roll = random.random()
         if roll < self.roll_threshold:
-            self.min_score = -float('inf')
+            self.min_score = -float("inf")
         else:
             # More advanced versions could skew the distribution to select higher scoring cells with higher probability,
             # but the uniform random method is cheaper, and may work about as well.
@@ -215,20 +218,21 @@ class ScoreBasedFilter(AbstractWeight):
             return 1
 
     def __repr__(self):
-        return f'ScoreBasedFilter()'
+        return f"ScoreBasedFilter()"
 
 
 class MaxScoreOnly(AbstractWeight):
     """
     When there are multiple cells that only differ in their score, only select cells that have the highest score.
     """
+
     def __init__(self, attr: str):
         self.max_score_dict = {}
         self.aggregated_cell_info = {}
         self.attr = attr
 
     def __repr__(self):
-        return f'MaxScoreOnly(attr={self.attr})'
+        return f"MaxScoreOnly(attr={self.attr})"
 
     def _get_no_score_key(self, key):
         no_score_key = copy.copy(key)
@@ -236,7 +240,7 @@ class MaxScoreOnly(AbstractWeight):
         return no_score_key
 
     def cell_update(self, cell_key, is_new, to_update, update_all, archive):
-        assert hasattr(cell_key, 'score')
+        assert hasattr(cell_key, "score")
         score = cell_key.score
         no_score_key = self._get_no_score_key(cell_key)
         if no_score_key not in self.max_score_dict:
@@ -247,7 +251,7 @@ class MaxScoreOnly(AbstractWeight):
         return to_update, update_all
 
     def multiplicative_weight(self, cell_key, cell, known_cells, special_attributes):
-        assert hasattr(cell_key, 'score')
+        assert hasattr(cell_key, "score")
         no_score_key = self._get_no_score_key(cell_key)
         if cell_key.score < self.max_score_dict[no_score_key]:
             return 0
@@ -270,7 +274,7 @@ class MaxScoreOnly(AbstractWeight):
 
     @staticmethod
     def get_name():
-        return 'aggregate'
+        return "aggregate"
 
 
 class MaxScoreReset(AbstractWeight):
@@ -279,6 +283,7 @@ class MaxScoreReset(AbstractWeight):
     In addition, do not aggregate the information from the other cells, calculate the probability of the highest scoring
     cell as if it was a brand-new cell.
     """
+
     def __init__(self):
         self.max_score_dict = {}
 
@@ -288,7 +293,7 @@ class MaxScoreReset(AbstractWeight):
         return no_score_key
 
     def cell_update(self, cell_key, is_new, to_update, update_all, archive):
-        assert hasattr(cell_key, 'score')
+        assert hasattr(cell_key, "score")
         score = cell_key.score
         no_score_key = self._get_no_score_key(cell_key)
         if no_score_key not in self.max_score_dict:
@@ -299,7 +304,7 @@ class MaxScoreReset(AbstractWeight):
         return to_update, update_all
 
     def multiplicative_weight(self, cell_key, cell, known_cells, special_attributes):
-        assert hasattr(cell_key, 'score')
+        assert hasattr(cell_key, "score")
         no_score_key = self._get_no_score_key(cell_key)
         if cell_key.score < self.max_score_dict[no_score_key]:
             return 0
@@ -307,28 +312,29 @@ class MaxScoreReset(AbstractWeight):
             return 1
 
     def __repr__(self):
-        return f'MaxScoreReset()'
+        return f"MaxScoreReset()"
 
 
 class MaxScoreOnlyNoScore(AbstractWeight):
     """
     When there are multiple cells that only differ in their score, only select cells that have the highest score.
     """
+
     def __init__(self, attr: str):
         self.attr = attr
 
     # noinspection PyUnusedLocal
     def calculate_value(self, cell_key, cell, known_cells):
-        assert not hasattr(cell_key, 'score')
+        assert not hasattr(cell_key, "score")
         attr_value = getattr(cell, self.attr)
         return attr_value
 
     @staticmethod
     def get_name():
-        return 'aggregate'
+        return "aggregate"
 
     def __repr__(self):
-        return f'MaxScoreOnlyNoScore(attr={self.attr})'
+        return f"MaxScoreOnlyNoScore(attr={self.attr})"
 
 
 class NeighborWeights(AbstractWeight):
@@ -354,8 +360,10 @@ class NeighborWeights(AbstractWeight):
         self.count_object_bits = False
 
     def __repr__(self):
-        return f'NeighborWeights(horiz={self.horiz}, vert={self.vert}, score_low={self.score_low}, ' \
-               f'score_high={self.score_high})'
+        return (
+            f"NeighborWeights(horiz={self.horiz}, vert={self.vert}, score_low={self.score_low}, "
+            f"score_high={self.score_high})"
+        )
 
     def get_neighbor(self, pos: MontezumaPosLevel, offset):
         x = pos.x + offset[0]
@@ -396,11 +404,13 @@ class NeighborWeights(AbstractWeight):
             return len(e)
         return number_of_set_bits(e)
 
-    def additive_weight(self,
-                        pos: MontezumaPosLevel,
-                        cell: CellInfoStochastic,
-                        known_cells: Dict[MontezumaPosLevel, CellInfoStochastic],
-                        special_attributes):
+    def additive_weight(
+        self,
+        pos: MontezumaPosLevel,
+        cell: CellInfoStochastic,
+        known_cells: Dict[MontezumaPosLevel, CellInfoStochastic],
+        special_attributes,
+    ):
         possible_scores = self.sorted_scores
 
         if pos not in self.cached_pos_weights:
@@ -428,15 +438,12 @@ class NeighborWeights(AbstractWeight):
 
             neigh_horiz = 0.0
             if self.horiz:
-                neigh_horiz = (self.no_neighbor(pos, (-1, 0), known_cells) + self.no_neighbor(pos, (1, 0), known_cells))
+                neigh_horiz = self.no_neighbor(pos, (-1, 0), known_cells) + self.no_neighbor(pos, (1, 0), known_cells)
             neigh_vert = 0.0
             if self.vert:
-                neigh_vert = (self.no_neighbor(pos, (0, -1), known_cells) + self.no_neighbor(pos, (0, 1), known_cells))
+                neigh_vert = self.no_neighbor(pos, (0, -1), known_cells) + self.no_neighbor(pos, (0, 1), known_cells)
 
-            res = (self.horiz * neigh_horiz +
-                   self.vert * neigh_vert +
-                   self.score_low * no_low +
-                   self.score_high * no_high)
+            res = self.horiz * neigh_horiz + self.vert * neigh_vert + self.score_low * no_low + self.score_high * no_high
             self.cached_pos_weights[pos] = res
         return self.cached_pos_weights[pos]
 
@@ -512,7 +519,7 @@ class LevelWeights(AbstractWeight):
         pass
 
     def __repr__(self):
-        return f'LevelWeights(low_level_weight={self.low_level_weight})'
+        return f"LevelWeights(low_level_weight={self.low_level_weight})"
 
 
 class AttrWeight(AbstractWeight):
@@ -527,10 +534,10 @@ class AttrWeight(AbstractWeight):
             value = special_attributes[cell_key][self.attr]
         else:
             value = getattr(cell, self.attr)
-        return self.weight * ((1 / (1 + self.scalar*value)) ** self.power)
+        return self.weight * ((1 / (1 + self.scalar * value)) ** self.power)
 
     def __repr__(self):
-        return f'AttrWeight(attr={self.attr}, weight={self.weight}, power={self.power}, scalar={self.scalar})'
+        return f"AttrWeight(attr={self.attr}, weight={self.weight}, power={self.power}, scalar={self.scalar})"
 
 
 class MultWeight(AbstractWeight):
@@ -544,10 +551,10 @@ class MultWeight(AbstractWeight):
             value = special_attributes[cell_key][self.attr]
         else:
             value = getattr(cell, self.attr)
-        return (1 / (1 + self.scalar*value)) ** self.power
+        return (1 / (1 + self.scalar * value)) ** self.power
 
     def __repr__(self):
-        return f'SubGoalFailWeight(attr={self.attr}, scalar={self.scalar}, power={self.power})'
+        return f"SubGoalFailWeight(attr={self.attr}, scalar={self.scalar}, power={self.power})"
 
 
 class SubGoalFailWeight(AbstractWeight):
@@ -557,18 +564,19 @@ class SubGoalFailWeight(AbstractWeight):
         return w
 
     def __repr__(self):
-        return f'SubGoalFailWeight()'
+        return f"SubGoalFailWeight()"
 
 
 # Special attributes
 
+
 class SpecialAttribute(object):
     def calculate_value(self, cell_key, cell, known_cells):
-        raise NotImplementedError('Special attributes need to implement value calculation')
+        raise NotImplementedError("Special attributes need to implement value calculation")
 
     @staticmethod
     def get_name():
-        raise NotImplementedError('Special attributes need to have a name')
+        raise NotImplementedError("Special attributes need to have a name")
 
 
 class WeightedSumAttribute(SpecialAttribute):
@@ -585,7 +593,7 @@ class WeightedSumAttribute(SpecialAttribute):
 
     @staticmethod
     def get_name():
-        return 'weighted_sum'
+        return "weighted_sum"
 
 
 class SubGoalFailAttribute(SpecialAttribute):
@@ -594,14 +602,17 @@ class SubGoalFailAttribute(SpecialAttribute):
 
     @staticmethod
     def get_name():
-        return 'sub_goal_fail'
+        return "sub_goal_fail"
 
 
 class WeightedSelector(Selector):
-    def __init__(self, selector_weights: List[AbstractWeight],
-                 special_attributes: List[SpecialAttribute],
-                 base_weight: float,
-                 weight_based_skew):
+    def __init__(
+        self,
+        selector_weights: List[AbstractWeight],
+        special_attributes: List[SpecialAttribute],
+        base_weight: float,
+        weight_based_skew,
+    ):
         #: List of the weights for each cell
         self.all_weights: List[float] = []
         #: List for the cell keys at the same index of the weights above
@@ -631,11 +642,9 @@ class WeightedSelector(Selector):
         is_new = cell_key not in self.cell_pos
 
         for weight in self.selector_weights:
-            self.to_update, self.update_all = weight.cell_update(cell_key,
-                                                                 is_new,
-                                                                 self.to_update,
-                                                                 self.update_all,
-                                                                 self.cell_pos)
+            self.to_update, self.update_all = weight.cell_update(
+                cell_key, is_new, self.to_update, self.update_all, self.cell_pos
+            )
 
         if is_new:
             self.cell_pos[cell_key] = len(self.all_weights)
@@ -675,7 +684,7 @@ class WeightedSelector(Selector):
             for i, cell in enumerate(weight_sorted_cells):
                 cell_index = self.cell_pos[cell]
                 weight_sum += self.all_weights[cell_index]
-                for j in range(i+1):
+                for j in range(i + 1):
                     j_cell = weight_sorted_cells[j]
                     j_cell_index = self.cell_pos[j_cell]
                     new_weights[j] += (self.all_weights[j_cell_index] / weight_sum) * (0.5 / len(self.all_weights))
@@ -726,9 +735,9 @@ class WeightedSelector(Selector):
         if len(self.cells) == 1:
             return [self.cells[0]] * size
         probabilities = self.get_probabilities(archive)
-        logger.debug(f'probabilities: {probabilities}')
+        logger.debug(f"probabilities: {probabilities}")
         selected = np.random.choice(self.cells, size=size, p=probabilities)
-        logger.debug(f'selected cell: {selected}')
+        logger.debug(f"selected cell: {selected}")
         return selected
 
     def get_weight(self, cell_key, cell, known_cells):
@@ -745,6 +754,6 @@ class WeightedSelector(Selector):
         for selector_weight in self.selector_weights:
             weight_f *= selector_weight.multiplicative_weight(cell_key, cell, known_cells, self.special_attribute_dict)
 
-        logger.debug(f'{cell_key} weight: {weight_f} score: {cell.score}')
+        logger.debug(f"{cell_key} weight: {weight_f} score: {cell.score}")
 
         return weight_f

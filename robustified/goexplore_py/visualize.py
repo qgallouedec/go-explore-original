@@ -1,22 +1,21 @@
-
 # Copyright (c) 2020 Uber Technologies, Inc.
 
 # Licensed under the Uber Non-Commercial License (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at the root directory of this project. 
+# You may obtain a copy of the License at the root directory of this project.
 
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
 
-import numpy as np
-import cv2
-import matplotlib.pyplot as plt
-import matplotlib.cm
-import matplotlib.colors
 import pickle
 from collections import defaultdict
 
+import cv2
+import matplotlib.cm
+import matplotlib.colors
+import matplotlib.pyplot as plt
+import numpy as np
 from goexplore_py.montezuma_env import PYRAMID
 
 
@@ -46,14 +45,14 @@ def render_with_known(data, filename):
         y_room, x_room = room_pos(room)
         y_room *= height
         x_room *= width
-        final_image[y_room:y_room + height, x_room:x_room + width, :] = img
+        final_image[y_room : y_room + height, x_room : x_room + width, :] = img
 
     plt.figure(figsize=(final_image.shape[1] // 30, final_image.shape[0] // 30))
 
     plt.imshow(final_image)
 
-    plt.axis('off')
-    plt.savefig(filename, bbox_inches='tight')
+    plt.axis("off")
+    plt.savefig(filename, bbox_inches="tight")
     plt.close()
 
 

@@ -1,15 +1,15 @@
-
 # Copyright (c) 2020 Uber Technologies, Inc.
 
 # Licensed under the Uber Non-Commercial License (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at the root directory of this project. 
+# You may obtain a copy of the License at the root directory of this project.
 
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
 
 from .import_ai import *
+
 
 class TimedPickle:
     def __init__(self, data, name, enabled=True):
@@ -23,7 +23,7 @@ class TimedPickle:
     def __setstate__(self, s):
         tstart, self.data, self.name, self.enabled = s
         if self.enabled:
-            print(f'pickle time for {self.name} = {time.time() - tstart} seconds')
+            print(f"pickle time for {self.name} = {time.time() - tstart} seconds")
 
 
 @contextmanager
@@ -48,18 +48,18 @@ def use_seed(seed):
 
 def get_code_hash():
     cur_dir = os.path.dirname(os.path.realpath(__file__))
-    all_code = ''
-    for f in sorted(glob.glob(cur_dir + '**/*.py', recursive=True)):
+    all_code = ""
+    for f in sorted(glob.glob(cur_dir + "**/*.py", recursive=True)):
         # We assume all whitespace is irrelevant, as well as comments
         with open(f) as f:
             for line in f:
-                line = line.partition('#')[0]
+                line = line.partition("#")[0]
                 line = line.rstrip()
 
-                all_code += ''.join(line.split())
+                all_code += "".join(line.split())
 
-    hash = hashlib.sha256(all_code.encode('utf8')).hexdigest()
-    print('HASH', hash)
+    hash = hashlib.sha256(all_code.encode("utf8")).hexdigest()
+    print("HASH", hash)
 
     return hash
 

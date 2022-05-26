@@ -6,12 +6,13 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Optional
-import os
 import logging
+import os
+from typing import List, Optional
+
 logger = logging.getLogger(__name__)
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 EXP_STRAT_INIT = -1
 EXP_STRAT_NONE = 0
@@ -27,7 +28,7 @@ BASE_PATH = None
 def set_action_meanings(meanings=List[str]):
     global ACTION_MEANINGS
     ACTION_MEANINGS = meanings
-    logger.debug(f'ACTION_MEANINGS set for process: {os.getpid()}')
+    logger.debug(f"ACTION_MEANINGS set for process: {os.getpid()}")
 
 
 def get_action_meaning(i):

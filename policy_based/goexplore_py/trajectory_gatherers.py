@@ -7,25 +7,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from collections import deque
-import horovod.tensorflow as hvd
-from typing import List, Union, Any
-import numpy as np
+from typing import Any, List, Union
 
-from goexplore_py.explorers import RepeatedRandomExplorer
-from goexplore_py.data_classes import CellInfoStochastic
 import goexplore_py.mpi_support as mpi
+import horovod.tensorflow as hvd
+import numpy as np
 from atari_reset.atari_reset.ppo import flatten_lists, safemean
+from goexplore_py.data_classes import CellInfoStochastic
+from goexplore_py.explorers import RepeatedRandomExplorer
 
 
 class StochasticGatherer:
-    def __init__(self,
-                 env,
-                 nb_of_epochs: int,
-                 learning_rate: float,
-                 log_window_size: int = 100,
-                 model=None,
-                 freeze_network=False,
-                 runner=None):
+    def __init__(
+        self,
+        env,
+        nb_of_epochs: int,
+        learning_rate: float,
+        log_window_size: int = 100,
+        model=None,
+        freeze_network=False,
+        runner=None,
+    ):
 
         # Parameters
         self.nb_of_epochs: int = nb_of_epochs
@@ -38,7 +40,7 @@ class StochasticGatherer:
         self.model = model
         self.runner = runner
         self.env = env
-        self.frame_skip = self.env.recursive_getattr('_skip')[0]
+        self.frame_skip = self.env.recursive_getattr("_skip")[0]
 
         # Persistent data (needs to be restored)
         self.ep_info_window = deque(maxlen=log_window_size)
@@ -63,7 +65,7 @@ class StochasticGatherer:
     def gather(self):
         self.runner.run()
 
-        if hasattr(self.runner, 'trunc_lst_mb_sil_valid'):
+        if hasattr(self.runner, "trunc_lst_mb_sil_valid"):
             diff = len(self.runner.trunc_lst_mb_sil_valid) - np.sum(self.runner.trunc_lst_mb_sil_valid)
             self.processed_frames = int(diff * self.frame_skip)
             sil_frames = self.runner.trunc_lst_mb_sil_valid
@@ -82,34 +84,36 @@ class StochasticGatherer:
             self.ep_infos_to_report = ep_infos
         else:
             self.ep_infos_to_report = self.ep_info_window
-        self.nb_return_goals_reached = sum([ei['reached'] for ei in self.ep_infos_to_report])
+        self.nb_return_goals_reached = sum([ei["reached"] for ei in self.ep_infos_to_report])
         self.nb_return_goals_chosen = len(self.ep_infos_to_report)
-        self.nb_exploration_goals_reached = sum([ei['nb_exploration_goals_reached'] for ei in self.ep_infos_to_report])
-        self.nb_exploration_goals_chosen = sum([ei['nb_exploration_goals_chosen'] for ei in self.ep_infos_to_report])
-        self.reward_mean = safemean([ei['r'] for ei in self.ep_infos_to_report])
-        self.length_mean = safemean([ei['l'] for ei in self.ep_infos_to_report])
+        self.nb_exploration_goals_reached = sum([ei["nb_exploration_goals_reached"] for ei in self.ep_infos_to_report])
+        self.nb_exploration_goals_chosen = sum([ei["nb_exploration_goals_chosen"] for ei in self.ep_infos_to_report])
+        self.reward_mean = safemean([ei["r"] for ei in self.ep_infos_to_report])
+        self.length_mean = safemean([ei["l"] for ei in self.ep_infos_to_report])
         self.nb_of_episodes += len(ep_infos)
-        self.return_goals_chosen = [ei['goal_chosen'] for ei in local_ep_infos]
-        self.return_goals_reached = [ei['reached'] for ei in local_ep_infos]
-        self.sub_goals = [ei['sub_goal'] for ei in local_ep_infos]
-        self.ent_incs = [ei['inc_ent'] for ei in local_ep_infos]
+        self.return_goals_chosen = [ei["goal_chosen"] for ei in local_ep_infos]
+        self.return_goals_reached = [ei["reached"] for ei in local_ep_infos]
+        self.sub_goals = [ei["sub_goal"] for ei in local_ep_infos]
+        self.ent_incs = [ei["inc_ent"] for ei in local_ep_infos]
 
         # We do not update the network during the warm up period
         if not self.freeze_network and not self.warm_up:
             self._train()
 
-        return (self.runner.ar_mb_cells,
-                self.runner.ar_mb_game_reward,
-                self.runner.trunc_lst_mb_trajectory_ids,
-                self.runner.trunc_lst_mb_dones,
-                self.runner.trunc_mb_obs,
-                self.runner.trunc_mb_goals,
-                self.runner.trunc_mb_actions,
-                self.runner.trunc_lst_mb_rewards,
-                sil_frames,
-                self.runner.ar_mb_ret_strat,
-                self.runner.ar_mb_traj_index,
-                self.runner.ar_mb_traj_len)
+        return (
+            self.runner.ar_mb_cells,
+            self.runner.ar_mb_game_reward,
+            self.runner.trunc_lst_mb_trajectory_ids,
+            self.runner.trunc_lst_mb_dones,
+            self.runner.trunc_mb_obs,
+            self.runner.trunc_mb_goals,
+            self.runner.trunc_mb_actions,
+            self.runner.trunc_lst_mb_rewards,
+            sil_frames,
+            self.runner.ar_mb_ret_strat,
+            self.runner.ar_mb_traj_index,
+            self.runner.ar_mb_traj_len,
+        )
 
     def broadcast_archive(self, archive):
         self.env.set_archive(archive)
@@ -118,7 +122,7 @@ class StochasticGatherer:
         self.env.set_selector(selector)
 
     def update_archive(self, new_archive_information):
-        self.env.recursive_call_method('update_archive', new_archive_information)
+        self.env.recursive_call_method("update_archive", new_archive_information)
 
     def init_archive(self):
         self.runner.init_obs()
@@ -132,13 +136,12 @@ class StochasticGatherer:
         self.model.save(filename)
 
     def get_state(self):
-        state = {'ep_info_window': self.ep_info_window,
-                 'nb_of_episodes': self.nb_of_episodes}
+        state = {"ep_info_window": self.ep_info_window, "nb_of_episodes": self.nb_of_episodes}
         return state
 
     def set_state(self, state):
-        self.ep_info_window = state['ep_info_window']
-        self.nb_of_episodes = state['nb_of_episodes']
+        self.ep_info_window = state["ep_info_window"]
+        self.nb_of_episodes = state["nb_of_episodes"]
 
     def close(self):
         if self.env:
@@ -146,11 +149,7 @@ class StochasticGatherer:
 
 
 class DeterministicGatherer:
-    def __init__(self,
-                 env,
-                 log_window_size=100,
-                 num_steps=160,
-                 explorer=None):
+    def __init__(self, env, log_window_size=100, num_steps=160, explorer=None):
         self.ep_info_window = deque(maxlen=log_window_size)
         self.env = env
 
@@ -181,14 +180,14 @@ class DeterministicGatherer:
             actions = [self.explorer.get_action(env) for env in self.env.get_envs()]
             obs_and_goals, rewards, dones, infos = self.env.step(actions)
             for info in infos:
-                maybe_ep_info = info.get('episode')
+                maybe_ep_info = info.get("episode")
                 if maybe_ep_info:
                     ep_infos.append(maybe_ep_info)
 
         if hvd.size() > 1:
             ep_infos = flatten_lists(mpi.COMM_WORLD.allgather(ep_infos))
 
-        trajectories = [ei['trajectory'] for ei in ep_infos]
+        trajectories = [ei["trajectory"] for ei in ep_infos]
 
         self.ep_info_window.extend(ep_infos)
         if len(ep_infos) >= 100:
@@ -196,18 +195,18 @@ class DeterministicGatherer:
         else:
             self.ep_infos_to_report = self.ep_info_window
 
-        self.nb_return_goals_reached = sum([ei['nb_return_goals_reached'] for ei in self.ep_infos_to_report])
-        self.nb_return_goals_chosen = sum([ei['nb_return_goals_chosen'] for ei in self.ep_infos_to_report])
-        self.nb_exploration_goals_reached = sum([ei['nb_exploration_goals_reached'] for ei in self.ep_infos_to_report])
-        self.nb_exploration_goals_chosen = sum([ei['nb_exploration_goals_chosen'] for ei in self.ep_infos_to_report])
-        self.return_goals_chosen = flatten_lists([ei['return_goals_chosen'] for ei in ep_infos])
-        self.return_goals_info_chosen = flatten_lists([ei['return_goals_info_chosen'] for ei in ep_infos])
-        self.exploration_goals_chosen = flatten_lists([ei['exploration_goals_chosen'] for ei in ep_infos])
-        self.return_goals_reached = flatten_lists([ei['return_goals_reached'] for ei in ep_infos])
-        self.exploration_goals_reached = flatten_lists([ei['exploration_goals_reached'] for ei in ep_infos])
-        self.restored = flatten_lists([ei['restored'] for ei in ep_infos])
-        self.reward_mean = safemean([ei['r'] for ei in self.ep_infos_to_report])
-        self.length_mean = safemean([ei['l'] for ei in self.ep_infos_to_report])
+        self.nb_return_goals_reached = sum([ei["nb_return_goals_reached"] for ei in self.ep_infos_to_report])
+        self.nb_return_goals_chosen = sum([ei["nb_return_goals_chosen"] for ei in self.ep_infos_to_report])
+        self.nb_exploration_goals_reached = sum([ei["nb_exploration_goals_reached"] for ei in self.ep_infos_to_report])
+        self.nb_exploration_goals_chosen = sum([ei["nb_exploration_goals_chosen"] for ei in self.ep_infos_to_report])
+        self.return_goals_chosen = flatten_lists([ei["return_goals_chosen"] for ei in ep_infos])
+        self.return_goals_info_chosen = flatten_lists([ei["return_goals_info_chosen"] for ei in ep_infos])
+        self.exploration_goals_chosen = flatten_lists([ei["exploration_goals_chosen"] for ei in ep_infos])
+        self.return_goals_reached = flatten_lists([ei["return_goals_reached"] for ei in ep_infos])
+        self.exploration_goals_reached = flatten_lists([ei["exploration_goals_reached"] for ei in ep_infos])
+        self.restored = flatten_lists([ei["restored"] for ei in ep_infos])
+        self.reward_mean = safemean([ei["r"] for ei in self.ep_infos_to_report])
+        self.length_mean = safemean([ei["l"] for ei in self.ep_infos_to_report])
         self.nb_of_episodes += len(trajectories)
 
         return trajectories

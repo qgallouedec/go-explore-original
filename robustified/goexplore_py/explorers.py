@@ -1,15 +1,15 @@
-
 # Copyright (c) 2020 Uber Technologies, Inc.
 
 # Licensed under the Uber Non-Commercial License (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at the root directory of this project. 
+# You may obtain a copy of the License at the root directory of this project.
 
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
 
 from .import_ai import *
+
 
 class RandomExplorer:
     def init_seed(self):
@@ -19,7 +19,7 @@ class RandomExplorer:
         return random.randint(0, env.action_space.n - 1)
 
     def __repr__(self):
-        return 'RandomExplorer()'
+        return "RandomExplorer()"
 
 
 class RepeatedRandomExplorer:
@@ -41,7 +41,7 @@ class RepeatedRandomExplorer:
         return self.action
 
     def __repr__(self):
-        return f'repeat-{self.mean_repeat}'
+        return f"repeat-{self.mean_repeat}"
 
 
 class RepeatedRandomExplorerRobot:
@@ -63,7 +63,7 @@ class RepeatedRandomExplorerRobot:
         return self.action
 
     def __repr__(self):
-        return f'repeat-{self.mean_repeat}'
+        return f"repeat-{self.mean_repeat}"
 
 
 class RandomDriftExplorerRobot:
@@ -77,11 +77,11 @@ class RandomDriftExplorerRobot:
         return env.prev_action + np.random.randn(env.prev_action.size) * self.sd
 
     def __repr__(self):
-        return f'drift-{self.sd}'
+        return f"drift-{self.sd}"
 
 
 def actstr(act):
-    return ' '.join([f'{e:01.2f}' for e in act])
+    return " ".join([f"{e:01.2f}" for e in act])
 
 
 class RandomDriftExplorerFetch:
@@ -96,7 +96,7 @@ class RandomDriftExplorerFetch:
         return action
 
     def __repr__(self):
-        return f'drift-{self.sd}'
+        return f"drift-{self.sd}"
 
 
 class RepeatedRandomExplorerFetch:
@@ -118,7 +118,7 @@ class RepeatedRandomExplorerFetch:
         return self.action
 
     def __repr__(self):
-        return f'repeat-{self.mean_repeat}'
+        return f"repeat-{self.mean_repeat}"
 
 
 class DoNothingExplorer:

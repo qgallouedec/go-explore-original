@@ -1,32 +1,36 @@
-
 # Copyright (c) 2020 Uber Technologies, Inc.
 
 # Licensed under the Uber Non-Commercial License (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at the root directory of this project. 
+# You may obtain a copy of the License at the root directory of this project.
 
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
 
+import types
+
 from .import_ai import *
 
-import types
-os.environ["PATH"] = os.environ["PATH"].replace('/usr/local/nvidia/bin', '')
+os.environ["PATH"] = os.environ["PATH"].replace("/usr/local/nvidia/bin", "")
 try:
-    import mujoco_py
-    import gym.envs.robotics.utils
     import gym.envs.robotics.rotations
+    import gym.envs.robotics.utils
+    import mujoco_py
 except Exception:
-    print('WARNING: could not import mujoco_py. This means robotics environments will not work')
+    print("WARNING: could not import mujoco_py. This means robotics environments will not work")
+import os
+from collections import defaultdict, namedtuple
+
 import gym.spaces
 from scipy.spatial.transform import Rotation
-from collections import defaultdict, namedtuple
-import os
 
-DOOR_NAMES = ['door', 'door1', 'latch1', 'latch']
+DOOR_NAMES = ["door", "door1", "latch1", "latch"]
 
-FetchState = namedtuple('FetchState', ('door_dists', 'door1_dists', 'gripped_info', 'gripped_pos', 'object_pos', 'gripper_pos'))
+FetchState = namedtuple(
+    "FetchState", ("door_dists", "door1_dists", "gripped_info", "gripped_pos", "object_pos", "gripper_pos")
+)
+
 
 class FakeAle:
     def __init__(self, env):
@@ -42,9 +46,11 @@ class FakeAle:
         assert self.env is not self
         return getattr(self.env, e)
 
+
 class FakeActionSet:
     def __getitem__(self, item):
         return item
+
 
 class FakeUnwrapped:
     def __init__(self, env):
@@ -67,25 +73,43 @@ class FakeUnwrapped:
         assert self.env is not self
         return getattr(self.env, e)
 
+
 class ComplexSpec:
     def __init__(self, id_):
         self.id = id_
 
+
 class ComplexFetchEnv:
     MJ_INIT = False
 
-    def __init__(self, model_file='teleOp_boxes.xml', nsubsteps=20, min_grip_score=0,
-                 max_grip_score=0, ret_full_state=True, incl_extra_full_state=False, max_steps=4000, target_single_shelf=False,
-                 combine_table_shelf_box=False, ordered_grip=False,
-                 do_tanh=False, target_location=None, timestep=0.002, state_is_pixels=False, include_proprioception=False,
-                 state_wh=192, state_azimuths='145_215', force_closed_doors=False):
+    def __init__(
+        self,
+        model_file="teleOp_boxes.xml",
+        nsubsteps=20,
+        min_grip_score=0,
+        max_grip_score=0,
+        ret_full_state=True,
+        incl_extra_full_state=False,
+        max_steps=4000,
+        target_single_shelf=False,
+        combine_table_shelf_box=False,
+        ordered_grip=False,
+        do_tanh=False,
+        target_location=None,
+        timestep=0.002,
+        state_is_pixels=False,
+        include_proprioception=False,
+        state_wh=192,
+        state_azimuths="145_215",
+        force_closed_doors=False,
+    ):
         self.force_closed_doors = force_closed_doors
         self.state_is_pixels = state_is_pixels
         self.include_proprioception = include_proprioception
         self.state_wh = state_wh
-        self.state_azimuths = [int(e) for e in state_azimuths.split('_')]
+        self.state_azimuths = [int(e) for e in state_azimuths.split("_")]
         self.do_tanh = do_tanh
-        model_file = os.path.dirname(os.path.realpath(__file__)) + '/fetch_xml/' + model_file
+        model_file = os.path.dirname(os.path.realpath(__file__)) + "/fetch_xml/" + model_file
         self.model = mujoco_py.load_model_from_path(model_file)
         self.sim = mujoco_py.MjSim(self.model, nsubsteps=nsubsteps)
         self.viewer = None
@@ -103,37 +127,41 @@ class ComplexFetchEnv:
         self.min_grip_score = min_grip_score
         self.max_grip_score = max_grip_score
         self.ret_full_state = ret_full_state and not state_is_pixels
-        self.incl_extra_full_state = (incl_extra_full_state and not include_proprioception)
+        self.incl_extra_full_state = incl_extra_full_state and not include_proprioception
         self.unwrapped = FakeUnwrapped(self)
         self.max_steps = max_steps
-        self.spec = ComplexSpec('fetch')
+        self.spec = ComplexSpec("fetch")
 
         self.filtered_idxs_for_full_state = None
 
-        self.contact_bodies = sorted([
-            'world',
-            'gripper_link',
-            'r_gripper_finger_link',
-            'l_gripper_finger_link',
-            'Table',
-            'DoorLR',
-            'frameR1',
-            'door1',
-            'latch1',
-            'frameL1',
-            'DoorUR',
-            'frameR',
-            'door',
-            'latch',
-            'frameL',
-            'Shelf',
-            'obj0',
-            'obj1',
-            'obj2',
-            'obj3',
-            'obj4'
-        ])
-        self.contact_body_idx = [(self.sim.model.body_name2id(c) if c in self.sim.model.body_names else None) for c in self.contact_bodies]
+        self.contact_bodies = sorted(
+            [
+                "world",
+                "gripper_link",
+                "r_gripper_finger_link",
+                "l_gripper_finger_link",
+                "Table",
+                "DoorLR",
+                "frameR1",
+                "door1",
+                "latch1",
+                "frameL1",
+                "DoorUR",
+                "frameR",
+                "door",
+                "latch",
+                "frameL",
+                "Shelf",
+                "obj0",
+                "obj1",
+                "obj2",
+                "obj3",
+                "obj4",
+            ]
+        )
+        self.contact_body_idx = [
+            (self.sim.model.body_name2id(c) if c in self.sim.model.body_names else None) for c in self.contact_bodies
+        ]
         self.contact_indexes = {}
         self.contact_names = []
         contact_idx = 0
@@ -144,35 +172,65 @@ class ComplexFetchEnv:
                 self.contact_names.append(pair)
                 contact_idx += 1
 
-        assert self.sim.model.nmocap == 1, 'Only supports model with a single mocap (for now)'
+        assert self.sim.model.nmocap == 1, "Only supports model with a single mocap (for now)"
         self.sim.data.mocap_pos[0, :] = [10, 10, 10]
         self.n_actions = len(self.sim.model.actuator_ctrlrange)
         self.sim.model.eq_active[0] = 0
 
         self.excluded_bodies = [
             # Elements in the world with a fixed position
-            'world', 'Table', 'Shelf',
+            "world",
+            "Table",
+            "Shelf",
             # These elements could move, but don't in the current implementation
-            'base_link', 'torso_lift_link', 'estop_link', 'laser_link'
+            "base_link",
+            "torso_lift_link",
+            "estop_link",
+            "laser_link",
         ]
-        self.excluded_bodies.append('mocap0')
+        self.excluded_bodies.append("mocap0")
 
-        self.action_space = gym.spaces.Box(-1., 1., shape=(self.n_actions,), dtype='float32')
+        self.action_space = gym.spaces.Box(-1.0, 1.0, shape=(self.n_actions,), dtype="float32")
         self.prev_action = np.zeros(self.n_actions)
-        self.observation_space = gym.spaces.Box(-3., 3., shape=(268 + 336 * incl_extra_full_state,), dtype='float32')
+        self.observation_space = gym.spaces.Box(-3.0, 3.0, shape=(268 + 336 * incl_extra_full_state,), dtype="float32")
         if state_is_pixels:
-            self.observation_space = gym.spaces.Box(0, 255, shape=(self.state_wh, self.state_wh, len(self.state_azimuths) * 3), dtype='uint8')
+            self.observation_space = gym.spaces.Box(
+                0, 255, shape=(self.state_wh, self.state_wh, len(self.state_azimuths) * 3), dtype="uint8"
+            )
             if include_proprioception:
                 old_obs_space = self.observation_space
-                self.observation_space = (gym.spaces.Box(-3., 255., shape=(np.product(self.observation_space.shape) + 156,), dtype='float32'))
+                self.observation_space = gym.spaces.Box(
+                    -3.0, 255.0, shape=(np.product(self.observation_space.shape) + 156,), dtype="float32"
+                )
                 self.observation_space.pixel_space = old_obs_space
                 self.excluded_bodies = [
                     # Elements in the world, regardless of position
-                    'world', 'Table', 'Shelf', 'mocap0', 'DoorLR', 'frameR1', 'door1',
-                    'latch1', 'frameL1', 'DoorUR', 'frameR', 'door', 'latch', 'frameL',
-                    'Shelf', 'obj0', 'obj1', 'obj2', 'obj3', 'obj4', 'obj5',
+                    "world",
+                    "Table",
+                    "Shelf",
+                    "mocap0",
+                    "DoorLR",
+                    "frameR1",
+                    "door1",
+                    "latch1",
+                    "frameL1",
+                    "DoorUR",
+                    "frameR",
+                    "door",
+                    "latch",
+                    "frameL",
+                    "Shelf",
+                    "obj0",
+                    "obj1",
+                    "obj2",
+                    "obj3",
+                    "obj4",
+                    "obj5",
                     # These elements could move, but don't in the current implementation
-                    'base_link', 'torso_lift_link', 'estop_link', 'laser_link'
+                    "base_link",
+                    "torso_lift_link",
+                    "estop_link",
+                    "laser_link",
                 ]
 
         # Actually the range is -1 to 1, but let's ignore this for now.
@@ -184,9 +242,9 @@ class ComplexFetchEnv:
         self.door_ids = [self.sim.model.body_name2id(name) for name in DOOR_NAMES]
         self.door_init_pos = [np.copy(self.sim.data.body_xpos[i]) for i in self.door_ids]
 
-        self.object_names = sorted([name for name in self.sim.model.body_names if 'obj' in name])
+        self.object_names = sorted([name for name in self.sim.model.body_names if "obj" in name])
         self.object_ids = [self.sim.model.body_name2id(name) for name in self.object_names]
-        self.grip_id = self.sim.model.body_name2id('gripper_link')
+        self.grip_id = self.sim.model.body_name2id("gripper_link")
 
         self.sim.model.opt.timestep = timestep
 
@@ -201,22 +259,24 @@ class ComplexFetchEnv:
 
         for e in range(self.sim.model.ngeom):
             body_name = self.sim.model.body_id2name(self.sim.model.geom_bodyid[e])
-            if body_name == 'Table' and self.sim.model.geom_contype[e]:
+            if body_name == "Table" and self.sim.model.geom_contype[e]:
                 table_range = get_geom_box(e, 1.2)
                 table_range[1][-1] = 100
-                self.boxes['table'] = table_range
-            elif body_name == 'annotation:outer_bound':
-                self.boxes['shelf'] = get_geom_box(e, 1.2)
-            elif 'annotation:inside' in str(body_name):
-                self.boxes[str(body_name)[len('annotation:inside_'):]] = get_geom_box(e, 0.9)
+                self.boxes["table"] = table_range
+            elif body_name == "annotation:outer_bound":
+                self.boxes["shelf"] = get_geom_box(e, 1.2)
+            elif "annotation:inside" in str(body_name):
+                self.boxes[str(body_name)[len("annotation:inside_") :]] = get_geom_box(e, 0.9)
 
         if combine_table_shelf_box:
-            combined_box = np.min([self.boxes['table'][0], self.boxes['shelf'][0]], axis=0), np.max([self.boxes['table'][1], self.boxes['shelf'][1]], axis=0)
-            self.boxes['table'] = combined_box
-            self.boxes['shelf'] = combined_box
+            combined_box = np.min([self.boxes["table"][0], self.boxes["shelf"][0]], axis=0), np.max(
+                [self.boxes["table"][1], self.boxes["shelf"][1]], axis=0
+            )
+            self.boxes["table"] = combined_box
+            self.boxes["shelf"] = combined_box
 
         self.box_names = sorted(self.boxes.keys())
-        assert self.box_names[-2:] == ['shelf', 'table']
+        assert self.box_names[-2:] == ["shelf", "table"]
 
         self.box_mins = np.array([self.boxes[name][0] for name in self.box_names])
         self.box_maxs = np.array([self.boxes[name][1] for name in self.box_names])
@@ -265,13 +325,12 @@ class ComplexFetchEnv:
             else:
                 pos.append(body_xpos[body])
 
-
         pos = np.array(pos)
         return np.all((self.box_mins <= pos[:, None, :]) & (pos[:, None, :] <= self.box_maxs), axis=2).astype(np.int32)
 
-    def render(self, mode='new', width=752, height=912, distance=3, azimuth=170, elevation=-30, cache_key='current'):
+    def render(self, mode="new", width=752, height=912, distance=3, azimuth=170, elevation=-30, cache_key="current"):
         key = (distance, azimuth, elevation)
-        target = 'latch1'
+        target = "latch1"
 
         if key not in self.render_cache[cache_key]:
             # The mujoco renderer is stupid and changes the inner state in minor
@@ -280,17 +339,17 @@ class ComplexFetchEnv:
             inner_state = copy.deepcopy(self.get_inner_state())
 
             if self.viewer is None:
-                if 'CUSTOM_DOCKER_IMAGE' not in os.environ:
+                if "CUSTOM_DOCKER_IMAGE" not in os.environ:
                     # We detected that we are running on desktop, in which case we should
                     # use glfw as the mode.
-                    mode = 'glfw'
-                if not self.__class__.MJ_INIT and mode == 'glfw':
+                    mode = "glfw"
+                if not self.__class__.MJ_INIT and mode == "glfw":
                     print("WTF")
                     try:
                         mujoco_py.MjViewer(self.sim)
                         print("WOW")
                     except Exception:
-                        print('Failed to initialize GLFW, rendering may or may not work.')
+                        print("Failed to initialize GLFW, rendering may or may not work.")
                     self.__class__.MJ_INIT = True
 
                 # Note: opus machines typically have 4 GPUs, but the docker is given access to just 1. The problem
@@ -302,8 +361,8 @@ class ComplexFetchEnv:
                         self.viewer = mujoco_py.MjRenderContextOffscreen(self.sim, device_id=device)
                         break
                     except RuntimeError:
-                        print('Device', device, 'didn\'t work.')
-                self.viewer.scn.flags[2] = 0 # Disable reflections (~25% speedup)
+                        print("Device", device, "didn't work.")
+                self.viewer.scn.flags[2] = 0  # Disable reflections (~25% speedup)
                 body_id = self.sim.model.body_name2id(target)
                 lookat = self.sim.data.body_xpos[body_id]
                 for idx, value in enumerate(lookat):
@@ -382,16 +441,17 @@ class ComplexFetchEnv:
             self.cached_done = False
             nopos = np.array([-1000.0, -1000.0, -1000.0])
 
-            GRIPPERS = ['l_gripper_finger_link', 'r_gripper_finger_link']
+            GRIPPERS = ["l_gripper_finger_link", "r_gripper_finger_link"]
             # Note: code for the 'fo' reason
             touching_table = set()
             gripped = defaultdict(set)
+
             def handle_names_contact(name1, name2):
-                if 'obj' in str(name1):
+                if "obj" in str(name1):
                     # Note: code for the 'fo' reason
-                    if 'able' in str(name2):
+                    if "able" in str(name2):
                         touching_table.add(name1)
-                    elif 'orld' in str(name2):
+                    elif "orld" in str(name2):
                         self.cached_done = True
                     elif name2 in GRIPPERS:
                         gripped[name1].add(name2)
@@ -424,9 +484,9 @@ class ComplexFetchEnv:
                 idx = self.door_ids[i]
                 init_pos = self.door_init_pos[i]
                 dist = np.linalg.norm(self.sim.data.body_xpos[idx] - init_pos)
-                if 'latch' in DOOR_NAMES[i]:
+                if "latch" in DOOR_NAMES[i]:
                     dist /= 2
-                if '1' in DOOR_NAMES[i]:
+                if "1" in DOOR_NAMES[i]:
                     door1_dists.append(dist)
                 else:
                     door_dists.append(dist)
@@ -437,20 +497,20 @@ class ComplexFetchEnv:
             body_pos = self.bodies_in_boxes(self.object_ids)
             for cur_pos, idx in zip(body_pos, self.object_ids):
                 # Note: remove table and shelf from the position
-                object_pos.append(''.join(map(str, cur_pos[:-2])))
-                if self.first_shelf_reached is None and object_pos[-1] != '0' * len(object_pos[-1]):
+                object_pos.append("".join(map(str, cur_pos[:-2])))
+                if self.first_shelf_reached is None and object_pos[-1] != "0" * len(object_pos[-1]):
                     self.first_shelf_reached = object_pos[-1]
                 elif self.target_single_shelf and object_pos[-1] != self.first_shelf_reached:
-                    object_pos[-1] = '0' * len(object_pos[-1])
+                    object_pos[-1] = "0" * len(object_pos[-1])
 
             if self.ordered_grip and gripped_info is not None:
                 min_grip_id = 0
                 while min_grip_id < len(object_pos):
-                    if object_pos[min_grip_id] == 0 or object_pos[min_grip_id] == '0000':
+                    if object_pos[min_grip_id] == 0 or object_pos[min_grip_id] == "0000":
                         break
                     min_grip_id += 1
 
-                if gripped_info[0] != f'obj{min_grip_id}' and gripped_info[0] != f'obj{min_grip_id-1}':
+                if gripped_info[0] != f"obj{min_grip_id}" and gripped_info[0] != f"obj{min_grip_id-1}":
                     gripped_info = None
                     gripped_pos = nopos
 
@@ -460,16 +520,16 @@ class ComplexFetchEnv:
                 gripped_info=gripped_info,
                 gripped_pos=gripped_pos,
                 object_pos=object_pos,
-                gripper_pos=grip_pos
+                gripper_pos=grip_pos,
             )
-            self.cached_info = {'done_reasons': done_reasons}
+            self.cached_info = {"done_reasons": done_reasons}
 
         return copy.deepcopy(self.cached_state)
 
     def _get_reward(self, prev_state, state):
         if self.target_location is None:
-            obj_prev = np.array(list(map(int, ''.join(prev_state.object_pos))))
-            obj_now = np.array(list(map(int, ''.join(state.object_pos))))
+            obj_prev = np.array(list(map(int, "".join(prev_state.object_pos))))
+            obj_now = np.array(list(map(int, "".join(state.object_pos))))
         else:
             obj_prev = np.array([int(e == self.target_location) for e in prev_state.object_pos])
             obj_now = np.array([int(e == self.target_location) for e in state.object_pos])
@@ -503,7 +563,7 @@ class ComplexFetchEnv:
         # Step 2: target
         target = [int(e) for e in self.target_location] if self.target_location else [0] * 4
         if include_names:
-            extra_names += ['target_location'] * 4
+            extra_names += ["target_location"] * 4
 
         # Step 3: boxes
         if include_names:
@@ -512,7 +572,7 @@ class ComplexFetchEnv:
                 for box in self.box_names:
                     extra_state.append(int(self.body_in_box(body, box)))
                     if include_names:
-                        extra_names.append(('in_box', self.sim.model.body_id2name(body), box))
+                        extra_names.append(("in_box", self.sim.model.body_id2name(body), box))
         else:
             extra_state = np.concatenate([contacts, target, self.bodies_in_boxes(self.contact_body_idx).flatten()])
 
@@ -525,7 +585,7 @@ class ComplexFetchEnv:
                 self.filtered_names_for_full_state = []
                 for e in self.sim.model.body_names:
                     # All "annotation" elements are virtual, while all "Door" and "frame" elements are static.
-                    if e in self.excluded_bodies or 'annotation' in e or 'Door' in e or 'frame' in e:
+                    if e in self.excluded_bodies or "annotation" in e or "Door" in e or "frame" in e:
                         continue
                     self.filtered_names_for_full_state.append(e)
                     self.filtered_idxs_for_full_state.append(self.sim.model.body_name2id(e))
@@ -538,26 +598,28 @@ class ComplexFetchEnv:
             if self.incl_extra_full_state:
                 extra_state, extra_names = self._get_extra_full_state(include_names)
                 all_state = np.empty(len(extra_state) + dim_size * n_dims)
-                all_state[dim_size * n_dims:] = extra_state
+                all_state[dim_size * n_dims :] = extra_state
             else:
                 all_state = np.empty(dim_size * n_dims)
 
             eulers = gym.envs.robotics.rotations.mat2euler(
-                self.sim.data.body_xmat[self.filtered_idxs_for_full_state].reshape((len(self.filtered_idxs_for_full_state), 3, 3))
+                self.sim.data.body_xmat[self.filtered_idxs_for_full_state].reshape(
+                    (len(self.filtered_idxs_for_full_state), 3, 3)
+                )
             )
 
             all_state[:dim_size] = eulers.flatten()
-            all_state[dim_size:2*dim_size] = self.sim.data.body_xpos[self.filtered_idxs_for_full_state].flatten()
-            all_state[dim_size*2:3*dim_size] = (self.sim.data.body_xvelp[self.filtered_idxs_for_full_state]).flatten()
-            all_state[dim_size*3:4*dim_size] = (self.sim.data.body_xvelr[self.filtered_idxs_for_full_state]).flatten()
-            all_state[dim_size*2:4*dim_size] *= dt
+            all_state[dim_size : 2 * dim_size] = self.sim.data.body_xpos[self.filtered_idxs_for_full_state].flatten()
+            all_state[dim_size * 2 : 3 * dim_size] = (self.sim.data.body_xvelp[self.filtered_idxs_for_full_state]).flatten()
+            all_state[dim_size * 3 : 4 * dim_size] = (self.sim.data.body_xvelr[self.filtered_idxs_for_full_state]).flatten()
+            all_state[dim_size * 2 : 4 * dim_size] *= dt
 
             if include_names:
                 all_names = []
-                for type in ['rot', 'pos', 'velp', 'velr']:
+                for type in ["rot", "pos", "velp", "velr"]:
                     for name in self.filtered_names_for_full_state:
-                        for sub in ['x', 'y', 'z']:
-                            all_names.append(f'{name}_{type}_{sub}')
+                        for sub in ["x", "y", "z"]:
+                            all_names.append(f"{name}_{type}_{sub}")
                 all_names += extra_names
                 assert len(all_names) == len(all_state)
                 self.cached_full_state = (all_state, all_names)
@@ -570,7 +632,7 @@ class ComplexFetchEnv:
         if res.shape != self.observation_space.shape and not self.include_proprioception:
             old_res = res
             res = np.zeros(self.observation_space.shape, dtype=res.dtype)
-            res[:old_res.size] = old_res
+            res[: old_res.size] = old_res
         return res
 
     def step(self, action_small, need_return=True):
@@ -589,8 +651,9 @@ class ComplexFetchEnv:
         action = np.clip(action, -1, 1)
         self.prev_action = action
         ctrl = (action + 1) / 2
-        ctrl = self.sim.model.actuator_ctrlrange[:, 0] + \
-                ctrl * (self.sim.model.actuator_ctrlrange[:, 1] - self.sim.model.actuator_ctrlrange[:, 0])
+        ctrl = self.sim.model.actuator_ctrlrange[:, 0] + ctrl * (
+            self.sim.model.actuator_ctrlrange[:, 1] - self.sim.model.actuator_ctrlrange[:, 0]
+        )
 
         self.sim.data.ctrl[:] = ctrl
 
@@ -600,7 +663,7 @@ class ComplexFetchEnv:
             had_exception = True
         self.cached_state = None
         self.cached_contacts = None
-        self.render_cache['current'] = {}
+        self.render_cache["current"] = {}
         self.cached_done = None
         self.cached_info = None
         self.cached_full_state = None
@@ -615,7 +678,7 @@ class ComplexFetchEnv:
         self.n_steps += 1
         if self.n_steps > self.max_steps:
             done = True
-            info['done_reasons'] = info.get('done_reasons', []) + ['ms']
+            info["done_reasons"] = info.get("done_reasons", []) + ["ms"]
         # Note that we don't give a negative rewards if done comes from reaching the max steps
         if not isinstance(state, FetchState):
             assert np.all(~np.isnan(state))
@@ -624,30 +687,30 @@ class ComplexFetchEnv:
         return copy.deepcopy((state, reward, (done or self.n_steps > self.max_steps), info))
 
     DATA_TO_SAVE = [
-        'qpos',
-        'qvel',
-        'act',
-        'mocap_pos',
-        'mocap_quat',
-        'userdata',
-        'qacc_warmstart',
-        'ctrl',
+        "qpos",
+        "qvel",
+        "act",
+        "mocap_pos",
+        "mocap_quat",
+        "userdata",
+        "qacc_warmstart",
+        "ctrl",
     ]
 
     def get_inner_state(self):
-        return copy.deepcopy((
-            tuple(
-                getattr(self.sim.data, attr) for attr in self.DATA_TO_SAVE
-            ),
-            self._get_state(),
-            self._get_done(),
-            (self._get_full_state() if self.ret_full_state else None),
-            self.n_steps,
-            self.has_had_contact,
-            self.first_shelf_reached,
-            self.prev_action,
-            self.cached_info
-        ))
+        return copy.deepcopy(
+            (
+                tuple(getattr(self.sim.data, attr) for attr in self.DATA_TO_SAVE),
+                self._get_state(),
+                self._get_done(),
+                (self._get_full_state() if self.ret_full_state else None),
+                self.n_steps,
+                self.has_had_contact,
+                self.first_shelf_reached,
+                self.prev_action,
+                self.cached_info,
+            )
+        )
 
     def set_inner_state(self, data):
         for attr, val in zip(self.DATA_TO_SAVE, data[0]):
@@ -668,21 +731,21 @@ class ComplexFetchEnv:
             self.cached_info = data[8]
         else:
             self.cached_info = None
-        self.render_cache['current'] = {}
+        self.render_cache["current"] = {}
 
         self.cached_contacts = None
 
     def reset(self):
         self.set_inner_state(self.start_state)
         if self.state_is_pixels:
-            return self._get_pixel_state(cache_key='reset')
+            return self._get_pixel_state(cache_key="reset")
         if self.ret_full_state:
             res = self._get_full_state()
         else:
             res = self._get_state()
         return res
 
-    def _get_pixel_state(self, cache_key='current'):
+    def _get_pixel_state(self, cache_key="current"):
         states = []
         for azimuth in self.state_azimuths:
             wh = self.state_wh
@@ -708,16 +771,31 @@ class MyComplexFetchEnv:
     TARGET_SHAPE = 0
     MAX_PIX_VALUE = 0
 
-    def __init__(self, model_file='teleOp_objects.xml', nsubsteps=20, min_grip_score=0, max_grip_score=0,
-                 target_single_shelf=False, combine_table_shelf_box=False, ordered_grip=False,
-                 target_location=None, timestep=0.002, force_closed_doors=False):
+    def __init__(
+        self,
+        model_file="teleOp_objects.xml",
+        nsubsteps=20,
+        min_grip_score=0,
+        max_grip_score=0,
+        target_single_shelf=False,
+        combine_table_shelf_box=False,
+        ordered_grip=False,
+        target_location=None,
+        timestep=0.002,
+        force_closed_doors=False,
+    ):
         self.env = ComplexFetchEnv(
-            model_file=model_file, nsubsteps=nsubsteps,
-            min_grip_score=min_grip_score, max_grip_score=max_grip_score,
-            ret_full_state=False, target_single_shelf=target_single_shelf,
-            combine_table_shelf_box=combine_table_shelf_box, ordered_grip=ordered_grip,
-            target_location=target_location, timestep=timestep,
-            force_closed_doors=force_closed_doors
+            model_file=model_file,
+            nsubsteps=nsubsteps,
+            min_grip_score=min_grip_score,
+            max_grip_score=max_grip_score,
+            ret_full_state=False,
+            target_single_shelf=target_single_shelf,
+            combine_table_shelf_box=combine_table_shelf_box,
+            ordered_grip=ordered_grip,
+            target_location=target_location,
+            timestep=timestep,
+            force_closed_doors=force_closed_doors,
         )
         self.rooms = []
 
@@ -732,9 +810,7 @@ class MyComplexFetchEnv:
         return self.env._get_state()
 
     def get_restore(self):
-        return (
-            self.env.get_inner_state(),
-        )
+        return (self.env.get_inner_state(),)
 
     def restore(self, data):
         self.env.set_inner_state(data[0])
@@ -746,6 +822,7 @@ class MyComplexFetchEnv:
     def get_pos(self):
         return self.env._get_state()
 
-    def render_with_known(self, known_positions, resolution, show=True, filename=None, combine_val=max,
-                          get_val=lambda x: x.score, minmax=None):
+    def render_with_known(
+        self, known_positions, resolution, show=True, filename=None, combine_val=max, get_val=lambda x: x.score, minmax=None
+    ):
         pass

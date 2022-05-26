@@ -6,9 +6,11 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import random
 import os
+import random
+
 import numpy as np
+
 from .globals import get_action_meaning, get_trajectory
 
 
@@ -20,7 +22,7 @@ class RandomExplorer:
         return random.randint(0, env.action_space.n - 1)
 
     def __repr__(self):
-        return 'RandomExplorer()'
+        return "RandomExplorer()"
 
 
 class RepeatedRandomExplorer:
@@ -42,7 +44,7 @@ class RepeatedRandomExplorer:
         return self.action
 
     def __repr__(self):
-        return f'repeat-{self.mean_repeat}'
+        return f"repeat-{self.mean_repeat}"
 
 
 class ReplayTrajectoryExplorer:
@@ -57,16 +59,16 @@ class ReplayTrajectoryExplorer:
         pass
 
     def get_action(self, env):
-        goal_rep = env.recursive_getattr('goal_cell_rep')
+        goal_rep = env.recursive_getattr("goal_cell_rep")
         current_cell = env.get_current_cell()
         # We have reached the end of our trajectory, a new goal should have been chosen
         if self.action_index >= len(self.trajectory):
-            goal = env.recursive_getattr('goal_cell_info')
-            print('Selected goal:', goal_rep)
-            print('Previous goal:', self.current_goal)
+            goal = env.recursive_getattr("goal_cell_info")
+            print("Selected goal:", goal_rep)
+            print("Previous goal:", self.current_goal)
             if goal_rep == self.current_goal:
                 print("ERROR: The same goal was selected twice in a row.")
-                raise Exception('The same goal was selected twice in a row.')
+                raise Exception("The same goal was selected twice in a row.")
             self.current_goal = goal_rep
             self.trajectory = get_trajectory(self.prev_idxs, self.actions, goal.traj_last)
             if goal.real_traj is not None:
@@ -77,15 +79,15 @@ class ReplayTrajectoryExplorer:
         elif goal_rep != self.current_goal:
             print("ERROR: New goal selected before trajectory to previous goal was finished.")
             print("Full trajectory was:", self.trajectory)
-            print('process id:', os.getpid())
+            print("process id:", os.getpid())
             print("Which is:", [get_action_meaning(a) for a in self.trajectory])
-            raise Exception('New goal selected before trajectory to previous goal was finished.')
+            raise Exception("New goal selected before trajectory to previous goal was finished.")
         if len(self.trajectory) > 0:
             action = self.trajectory[self.action_index]
             self.action_index += 1
         else:
             action = 0
-        print('In cell:', current_cell, 'Playing action:', self.action_index-1, action, get_action_meaning(action))
+        print("In cell:", current_cell, "Playing action:", self.action_index - 1, action, get_action_meaning(action))
         return action
 
 
@@ -108,7 +110,7 @@ class RepeatedRandomExplorerRobot:
         return self.action
 
     def __repr__(self):
-        return f'repeat-{self.mean_repeat}'
+        return f"repeat-{self.mean_repeat}"
 
 
 class DoNothingExplorer:

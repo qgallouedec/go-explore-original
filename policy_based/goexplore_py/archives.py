@@ -7,12 +7,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import sys
-from collections import deque, defaultdict
-from typing import Any, Dict, Set, Optional, Tuple
+from collections import defaultdict, deque
+from typing import Any, Dict, Optional, Set, Tuple
+
 import goexplore_py.data_classes as data_classes
-from goexplore_py.trajectory_manager import CellTrajectoryManager
-import horovod.tensorflow as hvd
 import goexplore_py.globals as global_const
+import horovod.tensorflow as hvd
+from goexplore_py.trajectory_manager import CellTrajectoryManager
 
 
 class StochasticArchive:
@@ -35,7 +36,7 @@ class StochasticArchive:
         self.cell_key_to_id_dict: Dict[Any, int] = {None: -1}
         self.local_cell_counter: int = 0
         self.cell_selector = cell_selector
-        self.max_score: float = -float('inf')
+        self.max_score: float = -float("inf")
         self.frames: int = 0
         self.frame_skip: int = 4
 
@@ -47,26 +48,27 @@ class StochasticArchive:
 
     def get_state(self):
         for key in self.archive:
-            assert key in self.cell_key_to_id_dict, 'key:' + str(key) + ' has no recorded id!'
+            assert key in self.cell_key_to_id_dict, "key:" + str(key) + " has no recorded id!"
 
         cell_set = set(self.cell_id_to_key_dict.values())
 
         for key in self.archive:
-            assert key in cell_set, 'key:' + str(key) + ' has no inverse id!'
+            assert key in cell_set, "key:" + str(key) + " has no inverse id!"
 
-        state = {'archive': self.archive,
-                 'trajectory_manager_state': self.cell_trajectory_manager.get_state(),
-                 'cell_id_to_key_dict': self.cell_id_to_key_dict,
-                 'cells_reached_dict': self.cells_reached_dict,
-                 }
+        state = {
+            "archive": self.archive,
+            "trajectory_manager_state": self.cell_trajectory_manager.get_state(),
+            "cell_id_to_key_dict": self.cell_id_to_key_dict,
+            "cells_reached_dict": self.cells_reached_dict,
+        }
         return state
 
     def set_state(self, state):
         # Directly set attributes
-        self.archive = state['archive']
-        self.cell_trajectory_manager.set_state(state['trajectory_manager_state'])
-        self.cell_id_to_key_dict = state['cell_id_to_key_dict']
-        self.cells_reached_dict = state['cells_reached_dict']
+        self.archive = state["archive"]
+        self.cell_trajectory_manager.set_state(state["trajectory_manager_state"])
+        self.cell_id_to_key_dict = state["cell_id_to_key_dict"]
+        self.cells_reached_dict = state["cells_reached_dict"]
 
         # Derived attributes
         self.local_cell_counter = 0
@@ -93,19 +95,19 @@ class StochasticArchive:
 
         for key in self.cell_key_to_id_dict:
             if key is not None:
-                assert key in self.archive, 'key:' + str(key) + ' not in archive!'
+                assert key in self.archive, "key:" + str(key) + " not in archive!"
 
         for key in self.archive:
-            assert key in self.cell_key_to_id_dict, 'key:' + str(key) + ' has no recorded id!'
+            assert key in self.cell_key_to_id_dict, "key:" + str(key) + " has no recorded id!"
 
     def get_name(self):
-        raise NotImplementedError('get_name needs to be implemented in archive!')
+        raise NotImplementedError("get_name needs to be implemented in archive!")
 
     def _get_cell(self, elem):
         return elem.cells[self.get_name()]
 
     def get_cell_from_env(self, env):
-        raise NotImplementedError('get_cell_from_env needs to be implemented in archive!')
+        raise NotImplementedError("get_cell_from_env needs to be implemented in archive!")
 
     def get_cells(self, env):
         cells = {self.get_name(): self.get_cell_from_env(env)}
@@ -132,8 +134,7 @@ class StochasticArchive:
             self.cell_trajectory_manager.sync_traj_end()
 
         for cell_key in self.archive:
-            self.archive[cell_key].nb_sub_goal_failed = max(min(self.archive[cell_key].nb_sub_goal_failed,
-                                                                self.max_failed), 0)
+            self.archive[cell_key].nb_sub_goal_failed = max(min(self.archive[cell_key].nb_sub_goal_failed, self.max_failed), 0)
             if self.archive[cell_key].nb_sub_goal_failed > self.max_failed * self.failed_threshold:
                 self.archive[cell_key].nb_failures_above_thresh += 1
             else:
@@ -146,8 +147,9 @@ class StochasticArchive:
                 self.archive[cell_key].nb_seen = 0
                 self.archive[cell_key].nb_reset += 1
 
-    def get_info_to_sync(self) -> Tuple[Dict[int, Any], Dict[Any, data_classes.CellInfoStochastic],
-                                        Dict[Any, Any], Dict[Any, int]]:
+    def get_info_to_sync(
+        self,
+    ) -> Tuple[Dict[int, Any], Dict[Any, data_classes.CellInfoStochastic], Dict[Any, Any], Dict[Any, int]]:
         updated_cell_id_to_key_dict = {}
         updated_cell_info = {}
         for cell in self.updated_cells:
@@ -185,7 +187,7 @@ class StochasticArchive:
                         else:
                             self.cell_trajectory_manager.cell_trajectories[traj_id].exp_new_cells -= 1
                     else:
-                        raise RuntimeError('Frames should never be equal!')
+                        raise RuntimeError("Frames should never be equal!")
 
             if self.should_accept_cell(cell_key, cell_info.score, cell_info.trajectory_len, cell_info.cell_traj_id):
                 self.update_cell(cell_key, cell_info)
@@ -242,12 +244,24 @@ class StochasticArchive:
         self.cell_trajectory_manager.start_update()
 
         for element in mb_data:
-            assert len(element) == len(mb_data[0]), 'All trajectory information should have the same length!'
+            assert len(element) == len(mb_data[0]), "All trajectory information should have the same length!"
 
         # Because observations and actions are one element longer than, for example, rewards, this effectively truncates
         # the last action and the last reward from the trajectory.
-        for (cell_key, game_reward, trajectory_id, done, ob, goal, action, reward, sil, exp_strat, traj_index,
-             traj_len) in zip(*mb_data):
+        for (
+            cell_key,
+            game_reward,
+            trajectory_id,
+            done,
+            ob,
+            goal,
+            action,
+            reward,
+            sil,
+            exp_strat,
+            traj_index,
+            traj_len,
+        ) in zip(*mb_data):
             if sil:
                 continue
 
@@ -271,8 +285,9 @@ class StochasticArchive:
             current_cell_key = cell_key
 
             new_cell = current_cell_key not in self.archive
-            self.cell_trajectory_manager.update_trajectory(current_cell_id, game_reward, ob, goal, action, reward,
-                                                           current_cell_key, exp_strat, new_cell)
+            self.cell_trajectory_manager.update_trajectory(
+                current_cell_id, game_reward, ob, goal, action, reward, current_cell_key, exp_strat, new_cell
+            )
             length = self.cell_trajectory_manager.current_length()
             score = self.cell_trajectory_manager.current_score()
 
@@ -285,16 +300,18 @@ class StochasticArchive:
                 else:
                     ret_discovered = exp_strat
                     should_reset = False
-                cell_info = data_classes.CellInfoStochastic(score,
-                                                            length,
-                                                            traj_id,
-                                                            traj_length,
-                                                            ret_discovered,
-                                                            self.frames,
-                                                            traj_id,
-                                                            traj_index,
-                                                            traj_len,
-                                                            should_reset)
+                cell_info = data_classes.CellInfoStochastic(
+                    score,
+                    length,
+                    traj_id,
+                    traj_length,
+                    ret_discovered,
+                    self.frames,
+                    traj_id,
+                    traj_index,
+                    traj_len,
+                    should_reset,
+                )
                 self.update_cell(current_cell_key, cell_info)
                 self.updated_cells.add(current_cell_key)
                 if new_cell:
@@ -319,8 +336,7 @@ class StochasticArchive:
         self.cell_trajectory_manager.finish_update()
 
     def update_goal_info(self, return_goals_chosen, return_goals_reached, sub_goals, inc_ents):
-        for goal_key, reached, sub_goal_key, inc_ent in zip(return_goals_chosen, return_goals_reached, sub_goals,
-                                                            inc_ents):
+        for goal_key, reached, sub_goal_key, inc_ent in zip(return_goals_chosen, return_goals_reached, sub_goals, inc_ents):
             # - update chosen and reached information
             cell_info = self.archive[goal_key]
             u_cell_info = self.updated_info[goal_key]
@@ -410,8 +426,9 @@ class StochasticArchive:
 
 class DomainKnowledgeArchive(StochasticArchive):
     def __init__(self, optimize_score, selector, cell_trajectory_manager, grid_info, max_failed, reset_on_update):
-        super(DomainKnowledgeArchive, self).__init__(optimize_score, selector, cell_trajectory_manager, max_failed,
-                                                     reset_on_update)
+        super(DomainKnowledgeArchive, self).__init__(
+            optimize_score, selector, cell_trajectory_manager, max_failed, reset_on_update
+        )
         self._domain_knowledge_cell_cache = None
         self.grid_info = grid_info
 
@@ -420,11 +437,11 @@ class DomainKnowledgeArchive(StochasticArchive):
         super(DomainKnowledgeArchive, self).clear_cache()
 
     def get_name(self):
-        return 'domain_knowledge_cell'
+        return "domain_knowledge_cell"
 
     def get_cell_from_env(self, env):
         if self._domain_knowledge_cell_cache is None:
-            self._domain_knowledge_cell_cache = env.recursive_call_method('get_pos')
+            self._domain_knowledge_cell_cache = env.recursive_call_method("get_pos")
         return self._domain_knowledge_cell_cache
 
 
@@ -432,10 +449,9 @@ class FirstRoomOnlyArchive(DomainKnowledgeArchive):
     def should_accept_cell(self, potential_cell_key, potential_cell, cur_score, full_traj_len):
         if potential_cell_key.room != 1:
             return False
-        return super(FirstRoomOnlyArchive, self).should_accept_cell(potential_cell_key,
-                                                                    potential_cell,
-                                                                    cur_score,
-                                                                    full_traj_len)
+        return super(FirstRoomOnlyArchive, self).should_accept_cell(
+            potential_cell_key, potential_cell, cur_score, full_traj_len
+        )
 
 
 class ArchiveCollection:
@@ -448,7 +464,7 @@ class ArchiveCollection:
             self.active_archive = archive
         if name is None:
             name = archive.get_name()
-        assert name not in self.archive_dict, 'Archive with name ' + name + ' already in collection'
+        assert name not in self.archive_dict, "Archive with name " + name + " already in collection"
         self.archive_dict[name] = archive
 
     def get_archive(self, name):

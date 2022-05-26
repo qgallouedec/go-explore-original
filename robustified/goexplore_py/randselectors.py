@@ -1,19 +1,18 @@
-
 # Copyright (c) 2020 Uber Technologies, Inc.
 
 # Licensed under the Uber Non-Commercial License (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at the root directory of this project. 
+# You may obtain a copy of the License at the root directory of this project.
 
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
 
-from .import_ai import *
-
 # from montezuma_env import *
 from goexplore_py.complex_fetch_env import *
 from goexplore_py.goexplore import DONE
+
+from .import_ai import *
 
 
 @dataclass()
@@ -22,7 +21,7 @@ class Weight:
     power: float = 1.0
 
     def __repr__(self):
-        return f'w={self.weight:.2f}=p={self.power:.2f}'
+        return f"w={self.weight:.2f}=p={self.power:.2f}"
 
 
 @dataclass()
@@ -33,13 +32,13 @@ class DirWeights:
     score_high: float = 0.0
 
     def __repr__(self):
-        return f'h={self.horiz:.2f}=v={self.vert:.2f}=l={self.score_low:.2f}=h={self.score_high:.2f}'
+        return f"h={self.horiz:.2f}=v={self.vert:.2f}=l={self.score_low:.2f}=h={self.score_high:.2f}"
 
 
 def numberOfSetBits(i):
     i = i - ((i >> 1) & 0x55555555)
     i = (i & 0x33333333) + ((i >> 2) & 0x33333333)
-    return (((i + (i >> 4) & 0xF0F0F0F) * 0x1010101) & 0xffffffff) >> 24
+    return (((i + (i >> 4) & 0xF0F0F0F) * 0x1010101) & 0xFFFFFFFF) >> 24
 
 
 def convert_score(e):
@@ -50,9 +49,19 @@ def convert_score(e):
 
 
 class WeightedSelector:
-    def __init__(self, game, seen=Weight(0.1), chosen=Weight(), action=Weight(0.1, power=0.5),
-                 room_cells=Weight(0.0, power=0.5), dir_weights=DirWeights(), low_level_weight=0.0,
-                 chosen_since_new_weight=Weight(), door_weight=0.0, grip_weight=0.0):
+    def __init__(
+        self,
+        game,
+        seen=Weight(0.1),
+        chosen=Weight(),
+        action=Weight(0.1, power=0.5),
+        room_cells=Weight(0.0, power=0.5),
+        dir_weights=DirWeights(),
+        low_level_weight=0.0,
+        chosen_since_new_weight=Weight(),
+        door_weight=0.0,
+        grip_weight=0.0,
+    ):
         self.seen: Weight = seen
         self.chosen: Weight = chosen
         self.chosen_since_new_weight: Weight = chosen_since_new_weight
@@ -112,10 +121,10 @@ class WeightedSelector:
                         self.update_all = True
                 if not isinstance(cell_key, tuple):
                     if cell_key.x < self.xrange[0] or cell_key.x > self.xrange[1]:
-                        self.xrange  = (min(cell_key.x, self.xrange[0]), max(cell_key.x, self.xrange[1]))
+                        self.xrange = (min(cell_key.x, self.xrange[0]), max(cell_key.x, self.xrange[1]))
                         self.update_all = True
                     if cell_key.y < self.yrange[0] or cell_key.y > self.yrange[1]:
-                        self.yrange  = (min(cell_key.y, self.yrange[0]), max(cell_key.y, self.yrange[1]))
+                        self.yrange = (min(cell_key.y, self.yrange[0]), max(cell_key.y, self.yrange[1]))
                         self.update_all = True
                     if cell_key.level > self.max_level:
                         self.max_level = cell_key.level
@@ -147,7 +156,11 @@ class WeightedSelector:
 
         self.to_update.add(cell_key)
 
-        if isinstance(cell_key, tuple) and self.dir_weights.score_high > 0.0000001 and prev_possible_scores != len(self.possible_scores):
+        if (
+            isinstance(cell_key, tuple)
+            and self.dir_weights.score_high > 0.0000001
+            and prev_possible_scores != len(self.possible_scores)
+        ):
             self.update_all = True
 
     def compute_weight(self, value, weight):
@@ -199,7 +212,9 @@ class WeightedSelector:
 
     def get_pos_weight(self, pos, cell, known_cells, possible_scores):
         if isinstance(pos, FetchState):
-            return self.door_weight * sum(pos.door_dists) + self.grip_weight * (pos.gripped_info[1] if pos.gripped_info is not None else 0)
+            return self.door_weight * sum(pos.door_dists) + self.grip_weight * (
+                pos.gripped_info[1] if pos.gripped_info is not None else 0
+            )
         elif isinstance(pos, tuple):
             # Logic for the score stuff: the highest score will get a weight of 1, second highest a weight of sqrt(1/2), third sqrt(1/3) etc.
             return self.dir_weights.score_high * 1 / np.sqrt(len(possible_scores) - possible_scores.index(cell.score))
@@ -228,12 +243,17 @@ class WeightedSelector:
 
             neigh_horiz = 0.0
             if self.dir_weights.horiz:
-                neigh_horiz = (self.no_neighbor(pos, (-1, 0), known_cells) + self.no_neighbor(pos, (1, 0), known_cells))
+                neigh_horiz = self.no_neighbor(pos, (-1, 0), known_cells) + self.no_neighbor(pos, (1, 0), known_cells)
             neigh_vert = 0.0
             if self.dir_weights.vert:
-                neigh_vert = (self.no_neighbor(pos, (0, -1), known_cells) + self.no_neighbor(pos, (0, 1), known_cells))
+                neigh_vert = self.no_neighbor(pos, (0, -1), known_cells) + self.no_neighbor(pos, (0, 1), known_cells)
 
-            res = self.dir_weights.horiz * neigh_horiz + self.dir_weights.vert * neigh_vert + self.dir_weights.score_low * no_low + self.dir_weights.score_high * no_high
+            res = (
+                self.dir_weights.horiz * neigh_horiz
+                + self.dir_weights.vert * neigh_vert
+                + self.dir_weights.score_low * no_low
+                + self.dir_weights.score_high * no_high
+            )
             self.cached_pos_weights[pos] = res
         return self.cached_pos_weights[pos]
 
@@ -247,19 +267,26 @@ class WeightedSelector:
             level_weight = self.low_level_weight ** (self.max_level - cell_key.level)
         elif isinstance(cell_key, FetchState):
             if False:  # TODO: make this accessible somehow
-                level_weight = (1/self.low_level_weight)**sum([(e if isinstance(e, int) else sum(map(int, e))) for e in cell_key.object_pos])
+                level_weight = (1 / self.low_level_weight) ** sum(
+                    [(e if isinstance(e, int) else sum(map(int, e))) for e in cell_key.object_pos]
+                )
             else:
+
                 def generate_next_levels(obj_pos):
                     next_levels = []
-                    if obj_pos[-1] == '0000':
-                        for new_elem in ['0001', '0010', '0100']:  # TODO: bring back 1000 if/when you find why it's never reached
+                    if obj_pos[-1] == "0000":
+                        for new_elem in [
+                            "0001",
+                            "0010",
+                            "0100",
+                        ]:  # TODO: bring back 1000 if/when you find why it's never reached
                             cur = list(obj_pos)
                             cur[-1] = new_elem
                             next_levels.append(tuple(cur))
-                    elif obj_pos[0] == '0000':
+                    elif obj_pos[0] == "0000":
                         new_obj_pos = list(obj_pos)
                         for i in range(1, len(new_obj_pos)):
-                            if new_obj_pos[i] != '0000':
+                            if new_obj_pos[i] != "0000":
                                 new_obj_pos[i - 1] = new_obj_pos[-1]
                                 break
                         next_levels.append(tuple(new_obj_pos))
@@ -269,12 +296,13 @@ class WeightedSelector:
                 level_weight = 1.0
         if level_weight == 0.0:
             return 0.0
-        res = (self.get_pos_weight(cell_key, cell, known_cells, possible_scores) +
-               self.get_seen_weight(cell) +
-               self.get_chosen_weight(cell) +
-               self.get_action_weight(cell) +
-               self.get_chosen_since_new_weight(cell)
-               ) * level_weight
+        res = (
+            self.get_pos_weight(cell_key, cell, known_cells, possible_scores)
+            + self.get_seen_weight(cell)
+            + self.get_chosen_weight(cell)
+            + self.get_action_weight(cell)
+            + self.get_chosen_since_new_weight(cell)
+        ) * level_weight
         return res
 
     def update_weights(self, known_cells):
@@ -291,7 +319,9 @@ class WeightedSelector:
             if example_key is not None:
                 break
 
-        possible_scores = sorted(self.possible_scores, key=((lambda x: x) if isinstance(example_key, tuple) else convert_score))
+        possible_scores = sorted(
+            self.possible_scores, key=((lambda x: x) if isinstance(example_key, tuple) else convert_score)
+        )
         for cell in to_update:
             idx = self.cell_pos[cell]
             self.all_weights[idx] = self.get_weight(cell, known_cells[cell], possible_scores, known_cells)
@@ -306,7 +336,7 @@ class WeightedSelector:
         # that this will slow things down (though not by much if you set the probability
         # to a low number like 0.1 or 0.01)
         if random.random() < 0.0 and len(self.cells) > 1:
-            tqdm.write('Testing weights')
+            tqdm.write("Testing weights")
             old_pos_weights = self.cached_pos_weights
             self.cached_pos_weights = {}
             to_choose = list(known_cells.keys())
@@ -318,33 +348,32 @@ class WeightedSelector:
                 possible_scores = sorted(set(e.score for e in to_choose), key=convert_score)
             else:
                 possible_scores = sorted(set(e.score for e in known_cells.values()))
-            weights = [
-                self.get_weight(
-                    k, known_cells[k], possible_scores, known_cells)
-                for k in to_choose
-            ]
+            weights = [self.get_weight(k, known_cells[k], possible_scores, known_cells) for k in to_choose]
 
             expected = dict(zip(to_choose, weights))
             actual = dict(zip(self.cells, self.all_weights))
             for k in expected:
                 EPS = 0.0000000001
                 if not (expected[k] - EPS < actual[k] < expected[k] + EPS):
-                    tqdm.write(f'Weight for {k}: {actual[k]} != {expected[k]}. Cached pos weight: {old_pos_weights.get(k)} vs {self.cached_pos_weights.get(k)}')
+                    tqdm.write(
+                        f"Weight for {k}: {actual[k]} != {expected[k]}. Cached pos weight: {old_pos_weights.get(k)} vs {self.cached_pos_weights.get(k)}"
+                    )
                     assert False
-
 
     def choose_cell(self, known_cells, size=1):
         self.update_weights(known_cells)
         if len(known_cells) != len(self.all_weights):
-            print('ERROR, known_cells has a different number of cells than all_weights')
-            print(f'Cell numbers: known_cells {len(known_cells)}, all_weights {len(self.all_weights)}, to_choose_idx {len(self.to_choose_idxs)}, cell_pos {len(self.cell_pos)}')
+            print("ERROR, known_cells has a different number of cells than all_weights")
+            print(
+                f"Cell numbers: known_cells {len(known_cells)}, all_weights {len(self.all_weights)}, to_choose_idx {len(self.to_choose_idxs)}, cell_pos {len(self.cell_pos)}"
+            )
             for c in known_cells:
                 if c not in self.cell_pos:
-                    print(f'Tracked but unknown cell: {c}')
+                    print(f"Tracked but unknown cell: {c}")
             for c in self.cell_pos:
                 if c not in known_cells:
-                    print(f'Untracked cell: {c}')
-            assert False, 'Incorrect length stuff'
+                    print(f"Untracked cell: {c}")
+            assert False, "Incorrect length stuff"
 
         if len(self.cells) == 1:
             return [self.cells[0]] * size
@@ -353,14 +382,10 @@ class WeightedSelector:
         weights = self.all_weights_nparray
         to_choose = self.cells
         total = np.sum(weights)
-        idxs = np.random.choice(
-            self.to_choose_idxs,
-            size=size,
-            p=weights / total
-        )
+        idxs = np.random.choice(self.to_choose_idxs, size=size, p=weights / total)
         # TODO: in extremely rare cases, we do select the DONE cell. Not sure why. We filter it out here but should
         # try to fix the underlying bug eventually.
         return [to_choose[i] for i in idxs if to_choose[i] != DONE]
 
     def __repr__(self):
-        return f'weight-seen-{self.seen}-chosen-{self.chosen}-chosen-since-new-{self.chosen_since_new_weight}-action-{self.action}-room-{self.room_cells}-dir-{self.dir_weights}'
+        return f"weight-seen-{self.seen}-chosen-{self.chosen}-chosen-since-new-{self.chosen_since_new_weight}-action-{self.action}-room-{self.room_cells}-dir-{self.dir_weights}"

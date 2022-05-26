@@ -8,7 +8,7 @@
 # limitations under the License.
 class SimpleLogger:
     def __init__(self, file_name):
-        self.file_handle = open(file_name, 'w')
+        self.file_handle = open(file_name, "w")
         self.column_names = []
         self.values = []
         self.first_line = True
@@ -24,13 +24,13 @@ class SimpleLogger:
             for i, column_name in enumerate(self.column_names):
                 self.file_handle.write(column_name)
                 if i < len(self.column_names) - 1:
-                    self.file_handle.write(', ')
-            self.file_handle.write('\n')
+                    self.file_handle.write(", ")
+            self.file_handle.write("\n")
         for i, value in enumerate(self.values):
             self.file_handle.write(str(value))
             if i < len(self.column_names) - 1:
-                self.file_handle.write(', ')
-        self.file_handle.write('\n')
+                self.file_handle.write(", ")
+        self.file_handle.write("\n")
         self.file_handle.flush()
         self.values = []
 

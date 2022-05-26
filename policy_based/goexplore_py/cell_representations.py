@@ -6,8 +6,9 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any, List, Type
+
 import numpy as np
-from typing import List, Any, Type
 from goexplore_py.montezuma_env import MyMontezuma
 from goexplore_py.pitfall_env import MyPitfall
 
@@ -18,22 +19,22 @@ class CellRepresentationBase:
 
     @staticmethod
     def make(env=None) -> Any:
-        raise NotImplementedError('Cell representation needs to implement make')
+        raise NotImplementedError("Cell representation needs to implement make")
 
     @staticmethod
     def get_array_length() -> int:
-        raise NotImplementedError('Cell representation needs to implement get_array_length')
+        raise NotImplementedError("Cell representation needs to implement get_array_length")
 
     @staticmethod
     def get_attributes() -> List[str]:
-        raise NotImplementedError('Cell representation needs to implement get_attributes')
+        raise NotImplementedError("Cell representation needs to implement get_attributes")
 
     @staticmethod
     def get_attr_max(name) -> int:
-        raise NotImplementedError('Cell representation needs to implement get_attr_max')
+        raise NotImplementedError("Cell representation needs to implement get_attr_max")
 
     def as_array(self) -> np.ndarray:
-        raise NotImplementedError('Cell representation needs to implement as_array')
+        raise NotImplementedError("Cell representation needs to implement as_array")
 
 
 class CellRepresentationFactory:
@@ -51,7 +52,7 @@ class CellRepresentationFactory:
             for dimension in self.grid_resolution:
                 if dimension.div != 1:
                     value = getattr(cell_representation, dimension.attr)
-                    value = (int(value / dimension.div))
+                    value = int(value / dimension.div)
                     setattr(cell_representation, dimension.attr, value)
 
         return cell_representation
@@ -80,14 +81,14 @@ class CellRepresentationFactory:
 
 
 class RoomXY(CellRepresentationBase):
-    __slots__ = ['_room', '_x', '_y', '_done', 'tuple']
-    attributes = ('room', 'x', 'y', 'done')
+    __slots__ = ["_room", "_x", "_y", "_done", "tuple"]
+    attributes = ("room", "x", "y", "done")
     array_length = 4
-    supported_games = ('pitfall', 'montezuma')
+    supported_games = ("pitfall", "montezuma")
 
     @staticmethod
     def get_attr_max(name):
-        if name == 'done':
+        if name == "done":
             return 2
         return MyPitfall.get_attr_max(name)
 
@@ -175,18 +176,18 @@ class RoomXY(CellRepresentationBase):
         self.tuple = d
 
     def __repr__(self):
-        return f'room={self._room} x={self._x} y={self._y} done={self._done}'
+        return f"room={self._room} x={self._x} y={self._y} done={self._done}"
 
 
 class PitfallPosLevel(CellRepresentationBase):
-    __slots__ = ['_treasures', '_room', '_x', '_y', '_done', 'tuple']
-    attributes = ('treasures', 'room', 'x', 'y', 'done')
+    __slots__ = ["_treasures", "_room", "_x", "_y", "_done", "tuple"]
+    attributes = ("treasures", "room", "x", "y", "done")
     array_length = 5
-    supported_games = ('pitfall',)
+    supported_games = ("pitfall",)
 
     @staticmethod
     def get_attr_max(name):
-        if name == 'done':
+        if name == "done":
             return 2
         return MyPitfall.get_attr_max(name)
 
@@ -285,18 +286,18 @@ class PitfallPosLevel(CellRepresentationBase):
         self.tuple = d
 
     def __repr__(self):
-        return f'room={self._room} treasures={self._treasures} x={self._x} y={self._y} done={self._done}'
+        return f"room={self._room} treasures={self._treasures} x={self._x} y={self._y} done={self._done}"
 
 
 class MontezumaPosLevel(CellRepresentationBase):
-    __slots__ = ['_level', '_objects', '_room', '_x', '_y', '_done', 'tuple']
-    attributes = ('level', 'objects', 'room', 'x', 'y', 'done')
+    __slots__ = ["_level", "_objects", "_room", "_x", "_y", "_done", "tuple"]
+    attributes = ("level", "objects", "room", "x", "y", "done")
     array_length = 6
-    supported_games = ('montezuma', 'montezumarevenge')
+    supported_games = ("montezuma", "montezumarevenge")
 
     @staticmethod
     def get_attr_max(name):
-        if name == 'done':
+        if name == "done":
             return 2
         return MyMontezuma.get_attr_max(name)
 
@@ -420,21 +421,20 @@ class MontezumaPosLevel(CellRepresentationBase):
         self.tuple = d
 
     def __repr__(self):
-        return f'Level={self._level} Room={self._room} Objects={self._objects} ' \
-            f'x={self._x} y={self._y} done={self._done}'
+        return f"Level={self._level} Room={self._room} Objects={self._objects} " f"x={self._x} y={self._y} done={self._done}"
 
 
 class LevelKeysRoomXYScore(CellRepresentationBase):
-    __slots__ = ['_level', '_objects', '_room', '_x', '_y', '_score', '_done', 'tuple', 'no_score_tuple']
-    attributes = ('level', 'objects', 'room', 'x', 'y', 'score')
+    __slots__ = ["_level", "_objects", "_room", "_x", "_y", "_score", "_done", "tuple", "no_score_tuple"]
+    attributes = ("level", "objects", "room", "x", "y", "score")
     array_length = 7
-    supported_games = ('montezuma', 'montezumarevenge')
+    supported_games = ("montezuma", "montezumarevenge")
 
     @staticmethod
     def get_attr_max(name):
-        if name == 'done':
+        if name == "done":
             return 2
-        if name == 'score':
+        if name == "score":
             return 0
         return MyMontezuma.get_attr_max(name)
 
@@ -563,5 +563,7 @@ class LevelKeysRoomXYScore(CellRepresentationBase):
         self.tuple = d
 
     def __repr__(self):
-        return f'Level={self._level} Room={self._room} Objects={self._objects} x={self._x} ' \
-            f'y={self._y} score={self._score} done={self.done}'
+        return (
+            f"Level={self._level} Room={self._room} Objects={self._objects} x={self._x} "
+            f"y={self._y} score={self._score} done={self.done}"
+        )

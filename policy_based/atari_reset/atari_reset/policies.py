@@ -2,11 +2,13 @@
 // Modifications Copyright (c) 2020 Uber Technologies Inc.
 """
 
+import logging
+
 import numpy as np
 import tensorflow as tf
-from tensorflow.nn import rnn_cell
 from baselines.common.distributions import make_pdtype
-import logging
+from tensorflow.nn import rnn_cell
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,6 +29,7 @@ def normc_init(std=1.0, axis=0):
         out = np.random.randn(*shape).astype(np.float32)
         out *= std / np.sqrt(np.square(out).sum(axis=axis, keepdims=True))
         return tf.constant(out)
+
     return _initializer
 
 
@@ -44,7 +47,8 @@ def ortho_init(scale=1.0):
         u, _, v = np.linalg.svd(a, full_matrices=False)
         q = u if u.shape == flat_shape else v  # pick the one with the correct shape
         q = q.reshape(shape)
-        return (scale * q[:shape[0], :shape[1]]).astype(np.float32)
+        return (scale * q[: shape[0], : shape[1]]).astype(np.float32)
+
     return _ortho_init
 
 
@@ -56,25 +60,26 @@ def fc(x, scope, nout, init_scale=1.0, init_bias=0.0):
         return tf.matmul(x, w) + b
 
 
-def conv(x, scope, noutchannels, filtsize, stride, pad='VALID', init_scale=1.0):
+def conv(x, scope, noutchannels, filtsize, stride, pad="VALID", init_scale=1.0):
     with tf.variable_scope(scope):
         nin = x.get_shape()[3].value
         w = tf.get_variable("w", [filtsize, filtsize, nin, noutchannels], initializer=ortho_init(init_scale))
         b = tf.get_variable("b", [noutchannels], initializer=tf.constant_initializer(0.0))
-        z = tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding=pad)+b
+        z = tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding=pad) + b
         return z
 
 
 class GRUCell(rnn_cell.RNNCell):
     """Gated Recurrent Unit cell (cf. http://arxiv.org/abs/1406.1078)."""
-    def __init__(self, num_units, name, nin, rec_gate_init=0.):
+
+    def __init__(self, num_units, name, nin, rec_gate_init=0.0):
         rnn_cell.RNNCell.__init__(self)
         self._num_units = num_units
         self.rec_gate_init = rec_gate_init
-        self.w1 = tf.get_variable(name + "w1", [nin+num_units, 2*num_units], initializer=normc_init(1.))
-        self.b1 = tf.get_variable(name + "b1", [2*num_units], initializer=tf.constant_initializer(rec_gate_init))
-        self.w2 = tf.get_variable(name + "w2", [nin+num_units, num_units], initializer=normc_init(1.))
-        self.b2 = tf.get_variable(name + "b2", [num_units], initializer=tf.constant_initializer(0.))
+        self.w1 = tf.get_variable(name + "w1", [nin + num_units, 2 * num_units], initializer=normc_init(1.0))
+        self.b1 = tf.get_variable(name + "b1", [2 * num_units], initializer=tf.constant_initializer(rec_gate_init))
+        self.w2 = tf.get_variable(name + "w2", [nin + num_units, num_units], initializer=normc_init(1.0))
+        self.b2 = tf.get_variable(name + "b2", [num_units], initializer=tf.constant_initializer(0.0))
 
     @property
     def state_size(self):
@@ -101,20 +106,19 @@ class GRUCell(rnn_cell.RNNCell):
 
 
 class CnnPolicy(object):
-
     def __init__(self, sess, ob_space, ac_space, nbatch, _nsteps, _test_mode=False, reuse=False):
         nh, nw, nc = ob_space.shape
         ob_shape = (nbatch, nh, nw, nc)
         nact = ac_space.n
         x = tf.placeholder(tf.uint8, ob_shape)
         with tf.variable_scope("model", reuse=reuse):
-            h = tf.nn.relu(conv(tf.cast(x, tf.float32)/255., 'c1', noutchannels=64, filtsize=8, stride=4))
-            h2 = tf.nn.relu(conv(h, 'c2', noutchannels=128, filtsize=4, stride=2))
-            h3 = tf.nn.relu(conv(h2, 'c3', noutchannels=128, filtsize=3, stride=1))
+            h = tf.nn.relu(conv(tf.cast(x, tf.float32) / 255.0, "c1", noutchannels=64, filtsize=8, stride=4))
+            h2 = tf.nn.relu(conv(h, "c2", noutchannels=128, filtsize=4, stride=2))
+            h3 = tf.nn.relu(conv(h2, "c3", noutchannels=128, filtsize=3, stride=1))
             h3 = to2d(h3)
-            h4 = tf.nn.relu(fc(h3, 'fc1', nout=1024))
-            pi = fc(h4, 'pi', nact, init_scale=0.01)
-            vf = fc(h4, 'v', 1, init_scale=0.01)[:, 0]
+            h4 = tf.nn.relu(fc(h3, "fc1", nout=1024))
+            pi = fc(h4, "pi", nact, init_scale=0.01)
+            vf = fc(h4, "v", 1, init_scale=0.01)[:, 0]
 
         self.pdtype = make_pdtype(ac_space)
         self.pd = self.pdtype.pdfromflat(pi)
@@ -138,10 +142,9 @@ class CnnPolicy(object):
 
 
 class GRUPolicy(object):
-
     def __init__(self, sess, ob_space, ac_space, nenv, nsteps, memsize=800, test_mode=False, reuse=False):
         nh, nw, nc = ob_space.shape
-        nbatch = nenv*nsteps
+        nbatch = nenv * nsteps
         ob_shape = (nbatch, nh, nw, nc)
         nact = ac_space.n
 
@@ -152,26 +155,26 @@ class GRUPolicy(object):
         e = tf.placeholder(tf.uint8, [nbatch])
 
         with tf.variable_scope("model", reuse=reuse):
-            h = tf.nn.relu(conv(tf.cast(x, tf.float32)/255., 'c1', noutchannels=64, filtsize=8, stride=4))
-            h2 = tf.nn.relu(conv(h, 'c2', noutchannels=128, filtsize=4, stride=2))
-            h3 = tf.nn.relu(conv(h2, 'c3', noutchannels=128, filtsize=3, stride=1))
+            h = tf.nn.relu(conv(tf.cast(x, tf.float32) / 255.0, "c1", noutchannels=64, filtsize=8, stride=4))
+            h2 = tf.nn.relu(conv(h, "c2", noutchannels=128, filtsize=4, stride=2))
+            h3 = tf.nn.relu(conv(h2, "c3", noutchannels=128, filtsize=3, stride=1))
             h3 = to2d(h3)
-            h4 = tf.contrib.layers.layer_norm(fc(h3, 'fc1', nout=memsize), center=False, scale=False,
-                                              activation_fn=tf.nn.relu)
+            h4 = tf.contrib.layers.layer_norm(fc(h3, "fc1", nout=memsize), center=False, scale=False, activation_fn=tf.nn.relu)
             h5 = tf.reshape(h4, [nenv, nsteps, memsize])
 
             m = tf.reshape(mask, [nenv, nsteps, 1])
-            cell = GRUCell(memsize, 'gru1', nin=memsize)
-            h6, snew = tf.nn.dynamic_rnn(cell, (h5, m), dtype=tf.float32, time_major=False, initial_state=states,
-                                         swap_memory=True)
+            cell = GRUCell(memsize, "gru1", nin=memsize)
+            h6, snew = tf.nn.dynamic_rnn(
+                cell, (h5, m), dtype=tf.float32, time_major=False, initial_state=states, swap_memory=True
+            )
 
             h7 = tf.concat([tf.reshape(h6, [nbatch, memsize]), h4], axis=1)
-            pi = fc(h7, 'pi', nact, init_scale=0.01)
+            pi = fc(h7, "pi", nact, init_scale=0.01)
             if test_mode:
-                pi *= 2.
+                pi *= 2.0
             else:
-                pi = tf.where(e > 0, pi/2., pi)
-            vf = tf.squeeze(fc(h7, 'v', 1, init_scale=0.01))
+                pi = tf.where(e > 0, pi / 2.0, pi)
+            vf = tf.squeeze(fc(h7, "v", 1, init_scale=0.01))
 
         self.pdtype = make_pdtype(ac_space)
         self.pd = self.pdtype.pdfromflat(pi)

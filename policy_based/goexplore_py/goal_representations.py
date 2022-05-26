@@ -6,17 +6,18 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any, List
+
 import numpy as np
-from typing import List, Any
 from gym import spaces
 
 
 class AbstractGoalRepresentation:
     def get_goal_space(self):
-        raise NotImplementedError('get_goal_space needs to be implemented.')
+        raise NotImplementedError("get_goal_space needs to be implemented.")
 
     def get(self, current_cell: Any, final_goal: Any, sub_goal: Any):
-        raise NotImplementedError('get needs to be implemented.')
+        raise NotImplementedError("get needs to be implemented.")
 
 
 class FlatGoalRep(AbstractGoalRepresentation):
@@ -26,44 +27,45 @@ class FlatGoalRep(AbstractGoalRepresentation):
         self.rel_sub_goal = rel_sub_goal
         self.length_data = length_data
 
-        if self.rep_type == 'final_goal':
+        if self.rep_type == "final_goal":
             self.total_length = self._get_length(self.rel_final_goal, length_data)
-        elif self.rep_type == 'sub_goal':
+        elif self.rep_type == "sub_goal":
             self.total_length = self._get_length(self.rel_sub_goal, length_data)
-        elif self.rep_type == 'final_goal_and_sub_goal':
-            self.total_length = (self._get_length(self.rel_final_goal, length_data) +
-                                 self._get_length(self.rel_sub_goal, length_data))
+        elif self.rep_type == "final_goal_and_sub_goal":
+            self.total_length = self._get_length(self.rel_final_goal, length_data) + self._get_length(
+                self.rel_sub_goal, length_data
+            )
         else:
-            raise NotImplementedError('Unknown representation type: ' + self.rep_type)
+            raise NotImplementedError("Unknown representation type: " + self.rep_type)
 
     def get_goal_space(self):
-        raise NotImplementedError('get_goal_space needs to be implemented.')
+        raise NotImplementedError("get_goal_space needs to be implemented.")
 
     def get(self, current_cell: Any, final_goal: Any, sub_goal: Any):
-        if self.rep_type == 'final_goal':
+        if self.rep_type == "final_goal":
             return self._get_goal_rep(final_goal, current_cell, self.rel_final_goal)
-        elif self.rep_type == 'sub_goal':
+        elif self.rep_type == "sub_goal":
             return self._get_goal_rep(sub_goal, current_cell, self.rel_sub_goal)
-        elif self.rep_type == 'final_goal_and_sub_goal':
+        elif self.rep_type == "final_goal_and_sub_goal":
             final_rep = self._get_goal_rep(final_goal, current_cell, self.rel_final_goal)
             sub_rep = self._get_goal_rep(sub_goal, current_cell, self.rel_sub_goal)
             return np.concatenate((sub_rep, final_rep))
         else:
-            raise NotImplementedError('Unknown representation type: ' + self.rep_type)
+            raise NotImplementedError("Unknown representation type: " + self.rep_type)
 
     def _get_length(self, relative: bool, length_data: Any):
-        raise NotImplementedError('_get_length needs to be implemented.')
+        raise NotImplementedError("_get_length needs to be implemented.")
 
     def _get_goal_rep(self, goal: Any, current_cell: Any, relative: bool):
-        raise NotImplementedError('_get_goal_rep needs to be implemented.')
+        raise NotImplementedError("_get_goal_rep needs to be implemented.")
 
 
 class ScaledGoalRep(FlatGoalRep):
     """
     Takes the array from a representation and divides it by normalizing constants.
     """
-    def __init__(self, rep_type: str, rel_final_goal: bool, rel_sub_goal: bool, rep_length, norm_const=None,
-                 off_const=None):
+
+    def __init__(self, rep_type: str, rel_final_goal: bool, rel_sub_goal: bool, rep_length, norm_const=None, off_const=None):
         super().__init__(rep_type, rel_final_goal, rel_sub_goal, rep_length)
 
         self.normalizing_constants = np.ones(rep_length)
@@ -75,7 +77,7 @@ class ScaledGoalRep(FlatGoalRep):
             self.offset_constants = off_const
 
     def get_goal_space(self):
-        return spaces.Box(low=-float('inf'), high=float('inf'), shape=(self.total_length,), dtype=np.float32)
+        return spaces.Box(low=-float("inf"), high=float("inf"), shape=(self.total_length,), dtype=np.float32)
 
     def _get_goal_rep(self, goal: Any, current_cell: Any, relative: bool):
         goal_rep = np.cast[np.float32](goal.as_array())
@@ -107,8 +109,8 @@ class GoalRepData:
             feature_index = max_value + int(self.goal_array[i]) - int(self.current_array[i])
             if feature_index < 0:
                 feature_index = 0
-            elif feature_index > max_value*2 - 1:
-                feature_index = max_value*2 - 1
+            elif feature_index > max_value * 2 - 1:
+                feature_index = max_value * 2 - 1
         else:
             feature_index = int(self.goal_array[i])
             if feature_index < 0:
@@ -122,6 +124,7 @@ class OneHotGoalRep(FlatGoalRep):
     """
     Takes the array from a representation and discretizes each value into a one-hot vector.
     """
+
     def __init__(self, rep_type: str, rel_final_goal: bool, rel_sub_goal: bool, rep_lengths: List[int]):
         super().__init__(rep_type, rel_final_goal, rel_sub_goal, rep_lengths)
 
@@ -152,19 +155,20 @@ class PosFilterGoalRep(AbstractGoalRepresentation):
     """
 
     def get(self, current_cell: Any, final_goal: Any, sub_goal: Any):
-        if self.rep_type == 'final_goal':
+        if self.rep_type == "final_goal":
             return self._get_goal_rep(final_goal)
-        elif self.rep_type == 'sub_goal':
+        elif self.rep_type == "sub_goal":
             return self._get_goal_rep(sub_goal)
-        elif self.rep_type == 'final_goal_and_sub_goal':
+        elif self.rep_type == "final_goal_and_sub_goal":
             final_rep = self._get_goal_rep(final_goal)
             sub_rep = self._get_goal_rep(sub_goal)
             return np.concatenate((sub_rep, final_rep))
         else:
-            raise NotImplementedError('Unknown representation type: ' + self.rep_type)
+            raise NotImplementedError("Unknown representation type: " + self.rep_type)
 
-    def __init__(self, shape, x_res, y_res, x_offset=0, y_offset=0, goal_value=1, norm_const=None, pos_only=False,
-                 rep_type='final_goal'):
+    def __init__(
+        self, shape, x_res, y_res, x_offset=0, y_offset=0, goal_value=1, norm_const=None, pos_only=False, rep_type="final_goal"
+    ):
         self.shape = shape
         self.x_res = x_res
         self.y_res = y_res
@@ -184,7 +188,7 @@ class PosFilterGoalRep(AbstractGoalRepresentation):
         goal_rep = np.zeros(self.shape)
         x = self.x_offset + goal.get_x() * self.x_res
         y = self.y_offset + goal.get_y() * self.y_res
-        goal_rep[x:x + self.x_res, y:y + self.y_res, 0] = self.goal_value
+        goal_rep[x : x + self.x_res, y : y + self.y_res, 0] = self.goal_value
         if not self.pos_only:
             non_pos_features = goal.non_pos_as_array()
             for i, feature in enumerate(non_pos_features):

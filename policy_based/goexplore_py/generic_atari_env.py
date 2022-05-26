@@ -6,21 +6,24 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
-import gym
 import copy
-from typing import Tuple, List
+from typing import List, Tuple
+
+import gym
+import numpy as np
 
 
 def convert_state(state):
     import cv2
-    return ((cv2.resize(cv2.cvtColor(state, cv2.COLOR_RGB2GRAY),
-                        MyAtari.TARGET_SHAPE, interpolation=cv2.INTER_AREA) / 255.0) *
-            MyAtari.MAX_PIX_VALUE).astype(np.uint8)
+
+    return (
+        (cv2.resize(cv2.cvtColor(state, cv2.COLOR_RGB2GRAY), MyAtari.TARGET_SHAPE, interpolation=cv2.INTER_AREA) / 255.0)
+        * MyAtari.MAX_PIX_VALUE
+    ).astype(np.uint8)
 
 
 class AtariPosLevel:
-    __slots__ = ['level', 'score', 'room', 'x', 'y', 'tuple']
+    __slots__ = ["level", "score", "room", "x", "y", "tuple"]
 
     def __init__(self, level=0, score=0, room=0, x=0, y=0):
         self.level = level
@@ -50,7 +53,7 @@ class AtariPosLevel:
         self.tuple = d
 
     def __repr__(self):
-        return f'Level={self.level} Room={self.room} Objects={self.score} x={self.x} y={self.y}'
+        return f"Level={self.level} Room={self.room} Objects={self.score} x={self.x} y={self.y}"
 
 
 def clip(a, min_v, max_v):
@@ -64,7 +67,7 @@ def clip(a, min_v, max_v):
 class MyAtari:
     def __init__(self, name, x_repeat=2, end_on_death=False):
         self.name = name
-        self.env = gym.make(f'{name}Deterministic-v4')
+        self.env = gym.make(f"{name}Deterministic-v4")
         self.env.reset()
         self.unwrapped.seed(0)
         self.state = []
@@ -118,6 +121,7 @@ class MyAtari:
         # NOTE: this only returns a dummy position
         return AtariPosLevel()
 
-    def render_with_known(self, known_positions, resolution, show=True, filename=None, combine_val=max,
-                          get_val=lambda x: x.score, minmax=None):
+    def render_with_known(
+        self, known_positions, resolution, show=True, filename=None, combine_val=max, get_val=lambda x: x.score, minmax=None
+    ):
         pass

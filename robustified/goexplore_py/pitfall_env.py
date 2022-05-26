@@ -1,9 +1,8 @@
-
 # Copyright (c) 2020 Uber Technologies, Inc.
 
 # Licensed under the Uber Non-Commercial License (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at the root directory of this project. 
+# You may obtain a copy of the License at the root directory of this project.
 
 # See the License for the specific language governing permissions and
 # limitations under the License.
@@ -14,7 +13,7 @@ from .utils import imdownscale
 
 
 class PitfallPosLevel:
-    __slots__ = ['level', 'score', 'room', 'x', 'y', 'tuple']
+    __slots__ = ["level", "score", "room", "x", "y", "tuple"]
 
     def __init__(self, level, score, room, x, y):
         self.level = 0
@@ -61,13 +60,19 @@ class MyPitfall:
     TARGET_SHAPE = None
     MAX_PIX_VALUE = None
 
-    def __init__(self, check_death: bool = True, unprocessed_state: bool = False, score_objects: bool = False,
-                 x_repeat=2, treasure_type='none'):
-        self.env = gym.make('PitfallDeterministic-v4')
+    def __init__(
+        self,
+        check_death: bool = True,
+        unprocessed_state: bool = False,
+        score_objects: bool = False,
+        x_repeat=2,
+        treasure_type="none",
+    ):
+        self.env = gym.make("PitfallDeterministic-v4")
         self.env.reset()
         self.score_objects = score_objects
         self.treasure_type = treasure_type
-        self.cur_treasure = tuple() if treasure_type == 'location' else 0
+        self.cur_treasure = tuple() if treasure_type == "location" else 0
         self.ram = None
         self.check_death = check_death
         self.cur_steps = 0
@@ -109,7 +114,7 @@ class MyPitfall:
     def pos_from_unprocessed_state(self, face_pixels):
         face_pixels = [(y, x * self.x_repeat) for y, x in face_pixels]
         if len(face_pixels) == 0:
-            assert self.pos != None, 'No face pixel and no previous pos'
+            assert self.pos != None, "No face pixel and no previous pos"
             return self.pos  # Simply re-use the same position
         y, x = np.mean(face_pixels, axis=0)
         room = 0
@@ -118,7 +123,7 @@ class MyPitfall:
             if y < 70:
                 room = (self.pos.room + direction_x) % 255
             else:
-                room = (self.pos.room + direction_x*3) % 255
+                room = (self.pos.room + direction_x * 3) % 255
 
         return PitfallPosLevel(0, self.cur_treasure, room, x, y)
 
@@ -133,11 +138,22 @@ class MyPitfall:
             self.ram_death_state,
             self.score_objects,
             self.cur_lives,
-            copy.copy(self.cur_treasure)
+            copy.copy(self.cur_treasure),
         )
 
     def restore(self, data):
-        (full_state, state, score, steps, pos, room_time, ram_death_state, self.score_objects, self.cur_lives, self.cur_treasure) = data
+        (
+            full_state,
+            state,
+            score,
+            steps,
+            pos,
+            room_time,
+            ram_death_state,
+            self.score_objects,
+            self.cur_lives,
+            self.cur_treasure,
+        ) = data
         self.state = copy.copy(state)
         self.env.reset()
         self.unwrapped.restore_state(full_state)
@@ -154,10 +170,10 @@ class MyPitfall:
         # The screen is a transition screen if it is all black or if its color is made up only of black and
         # (0, 28, 136), which is a color seen in the transition screens between two levels.
         return (
-                       np.sum(unprocessed_state[:, :, 0] == 0) +
-                       np.sum((unprocessed_state[:, :, 1] == 0) | (unprocessed_state[:, :, 1] == 28)) +
-                       np.sum((unprocessed_state[:, :, 2] == 0) | (unprocessed_state[:, :, 2] == 136))
-               ) == unprocessed_state.size
+            np.sum(unprocessed_state[:, :, 0] == 0)
+            + np.sum((unprocessed_state[:, :, 1] == 0) | (unprocessed_state[:, :, 1] == 28))
+            + np.sum((unprocessed_state[:, :, 2] == 0) | (unprocessed_state[:, :, 2] == 136))
+        ) == unprocessed_state.size
 
     def get_face_pixels(self, unprocessed_state):
         result = set(zip(*np.where(unprocessed_state[50:, :, 0] == 228)))
@@ -202,25 +218,23 @@ class MyPitfall:
         if self.pos.room != self.room_time[0]:
             self.room_time = (self.pos.room, 0)
         self.room_time = (self.pos.room, self.room_time[1] + 1)
-        if (self.pos.room not in self.rooms or
-                (self.room_time[1] == self.room_threshold and
-                 not self.rooms[self.pos.room][0])):
+        if self.pos.room not in self.rooms or (self.room_time[1] == self.room_threshold and not self.rooms[self.pos.room][0]):
             self.rooms[self.pos.room] = (
                 self.room_time[1] == self.room_threshold,
-                unprocessed_state[50:].repeat(self.x_repeat, axis=1)
+                unprocessed_state[50:].repeat(self.x_repeat, axis=1),
             )
 
         if reward > 0:
-            if self.treasure_type == 'count':
+            if self.treasure_type == "count":
                 self.cur_treasure += 1
-            elif self.treasure_type == 'score':
+            elif self.treasure_type == "score":
                 self.cur_treasure += reward
-            elif self.treasure_type == 'location':
+            elif self.treasure_type == "location":
                 self.cur_treasure = tuple(sorted(list(self.cur_treasure) + [self.pos.room]))
-            elif self.treasure_type == 'none':
+            elif self.treasure_type == "none":
                 pass
             else:
-                assert False, f'Unknown treasure type: {self.treasure_type}'
+                assert False, f"Unknown treasure type: {self.treasure_type}"
 
         if self.unprocessed_state:
             return unprocessed_state, reward, done, lol
@@ -230,8 +244,9 @@ class MyPitfall:
         assert self.pos is not None
         return self.pos
 
-    def render_with_known(self, known_positions, resolution, show=True, filename=None, combine_val=max,
-                          get_val=lambda x: x.score, minmax=None):
+    def render_with_known(
+        self, known_positions, resolution, show=True, filename=None, combine_val=max, get_val=lambda x: x.score, minmax=None
+    ):
         height, width = list(self.rooms.values())[0][1].shape[:2]
         final_image = np.zeros((height * 22, width * 12, 3), dtype=np.uint8) + 255
 
@@ -250,7 +265,7 @@ class MyPitfall:
             y_room, x_room = room_pos(room)
             y_room *= height
             x_room *= width
-            final_image[y_room:y_room + height, x_room:x_room + width, :] = img
+            final_image[y_room : y_room + height, x_room : x_room + width, :] = img
 
         plt.figure(figsize=(final_image.shape[1] // 40, final_image.shape[0] // 40))
 
@@ -266,10 +281,20 @@ class MyPitfall:
 
             cv2.line(final_image, (x_room, y_room), (x_room, y_room + img.shape[0]), (255, 255, 255), 1)
             cv2.line(final_image, (x_room, y_room), (x_room + img.shape[1], y_room), (255, 255, 255), 1)
-            cv2.line(final_image, (x_room + img.shape[1], y_room), (x_room + img.shape[1], y_room + img.shape[0]),
-                     (255, 255, 255), 1)
-            cv2.line(final_image, (x_room, y_room + img.shape[0]), (x_room + img.shape[1], y_room + img.shape[0]),
-                     (255, 255, 255), 1)
+            cv2.line(
+                final_image,
+                (x_room + img.shape[1], y_room),
+                (x_room + img.shape[1], y_room + img.shape[0]),
+                (255, 255, 255),
+                1,
+            )
+            cv2.line(
+                final_image,
+                (x_room, y_room + img.shape[0]),
+                (x_room + img.shape[1], y_room + img.shape[0]),
+                (255, 255, 255),
+                1,
+            )
 
             for k in known_positions:
                 if k.room != room:
@@ -286,21 +311,29 @@ class MyPitfall:
 
         vals = list(points.values())
         points = list(points.items())
-        plt.scatter([p[0][0] for p in points], [p[0][1] for p in points], c=[p[1] for p in points], cmap='bwr',
-                    s=(resolution) ** 2, marker='*')
+        plt.scatter(
+            [p[0][0] for p in points],
+            [p[0][1] for p in points],
+            c=[p[1] for p in points],
+            cmap="bwr",
+            s=(resolution) ** 2,
+            marker="*",
+        )
         plt.legend()
 
         import matplotlib.cm
         import matplotlib.colors
-        mappable = matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(vmin=np.min(vals), vmax=np.max(vals)),
-                                                cmap='bwr')
+
+        mappable = matplotlib.cm.ScalarMappable(
+            norm=matplotlib.colors.Normalize(vmin=np.min(vals), vmax=np.max(vals)), cmap="bwr"
+        )
         mappable.set_array(vals)
-        matplotlib.rcParams.update({'font.size': 50})
+        matplotlib.rcParams.update({"font.size": 50})
         plt.colorbar(mappable, fraction=0.043, pad=0.01)
 
-        plt.axis('off')
+        plt.axis("off")
         if filename is not None:
-            plt.savefig(filename, bbox_inches='tight')
+            plt.savefig(filename, bbox_inches="tight")
         if show:
             plt.show()
         else:
@@ -330,6 +363,7 @@ class MyPitfall:
         if MyPitfall.TARGET_SHAPE is None:
             return None
         import cv2
+
         state = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
         if MyPitfall.TARGET_SHAPE == (-1, -1):
             return RLEArray(state)

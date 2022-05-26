@@ -6,13 +6,14 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import cv2
 import copy
 import time
-import numpy as np
-import matplotlib.pyplot as plt
-from typing import Tuple, List, Any
 from collections import defaultdict
+from typing import Any, List, Tuple
+
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 from atari_reset.atari_reset.wrappers import MyWrapper
 
 
@@ -20,9 +21,8 @@ def convert_state(state):
     if MyMontezuma.TARGET_SHAPE is None:
         return None
     import cv2
-    resized_state = cv2.resize(cv2.cvtColor(state, cv2.COLOR_RGB2GRAY),
-                               MyMontezuma.TARGET_SHAPE,
-                               interpolation=cv2.INTER_AREA)
+
+    resized_state = cv2.resize(cv2.cvtColor(state, cv2.COLOR_RGB2GRAY), MyMontezuma.TARGET_SHAPE, interpolation=cv2.INTER_AREA)
     return ((resized_state / 255.0) * MyMontezuma.MAX_PIX_VALUE).astype(np.uint8)
 
 
@@ -30,7 +30,7 @@ PYRAMID = [
     [-1, -1, -1, 0, 1, 2, -1, -1, -1],
     [-1, -1, 3, 4, 5, 6, 7, -1, -1],
     [-1, 8, 9, 10, 11, 12, 13, 14, -1],
-    [15, 16, 17, 18, 19, 20, 21, 22, 23]
+    [15, 16, 17, 18, 19, 20, 21, 22, 23],
 ]
 
 NB_KEY_PIXELS = 40
@@ -42,7 +42,7 @@ OBJECT_PIXELS = [
     NB_KEY_PIXELS,  # Key 3
     37,  # Sword 1
     37,  # Sword 2
-    42   # Torch
+    42,  # Torch
 ]
 
 KNOWN_XY: List[Any] = [None] * 24
@@ -78,28 +78,28 @@ class MyMontezuma(MyWrapper):
     screen_width = 160
     screen_height = 210 - 50
     x_repeat = 2
-    attr_max = {'level': 3,
-                'room': 24,
-                'objects': 4}
+    attr_max = {"level": 3, "room": 24, "objects": 4}
 
     @staticmethod
     def get_attr_max(name):
-        if name == 'x':
+        if name == "x":
             return MyMontezuma.screen_width * MyMontezuma.x_repeat
-        elif name == 'y':
+        elif name == "y":
             return MyMontezuma.screen_height
         else:
             return MyMontezuma.attr_max[name]
 
-    def __init__(self,
-                 env,
-                 check_death: bool = True,
-                 score_objects: bool = False,
-                 objects_from_pixels=True,
-                 objects_remember_rooms=False,
-                 only_keys=False,
-                 only_nb_keys=True,
-                 cell_representation=None):
+    def __init__(
+        self,
+        env,
+        check_death: bool = True,
+        score_objects: bool = False,
+        objects_from_pixels=True,
+        objects_remember_rooms=False,
+        only_keys=False,
+        only_nb_keys=True,
+        cell_representation=None,
+    ):
         super(MyMontezuma, self).__init__(env)
         self.env.reset()
         self.score_objects = score_objects
@@ -168,7 +168,7 @@ class MyMontezuma(MyWrapper):
         face_pixels = [(y, x * self.x_repeat) for y, x in face_pixels]
         # While we are dead or if we are on a transition screen, we assume that our position does not change
         if len(face_pixels) == 0:
-            assert self.pos is not None, 'No face pixel and no previous pos'
+            assert self.pos is not None, "No face pixel and no previous pos"
             return self.pos  # Simply re-use the same position
         y, x = np.mean(face_pixels, axis=0)
         room = 1
@@ -202,11 +202,13 @@ class MyMontezuma(MyWrapper):
                 else:
                     direction_y = 0
 
-                assert direction_x == 0 or direction_y == 0, f'Room change in more than two directions : ' \
-                                                             f'({direction_y}, {direction_x}) room={self.room} ' \
-                                                             f'prev={self.x},{self.y} new={x},{y}'
+                assert direction_x == 0 or direction_y == 0, (
+                    f"Room change in more than two directions : "
+                    f"({direction_y}, {direction_x}) room={self.room} "
+                    f"prev={self.x},{self.y} new={x},{y}"
+                )
                 room = PYRAMID[room_y + direction_y][room_x + direction_x]
-                assert room != -1, f'Impossible room change: ({direction_y}, {direction_x})'
+                assert room != -1, f"Impossible room change: ({direction_y}, {direction_x})"
 
         score = self.cur_score
         if self.score_objects:
@@ -275,7 +277,7 @@ class MyMontezuma(MyWrapper):
             self.room_time,
             self.ram_death_state,
             self.score_objects,
-            self.cur_lives
+            self.cur_lives,
         )
 
     def restore(self, data):
@@ -299,10 +301,10 @@ class MyMontezuma(MyWrapper):
         # The screen is a transition screen if it is all black or if its color is made up only of black and
         # (0, 28, 136), which is a color seen in the transition screens between two levels.
         return (
-                       np.sum(unprocessed_state[:, :, 0] == 0) +
-                       np.sum((unprocessed_state[:, :, 1] == 0) | (unprocessed_state[:, :, 1] == 28)) +
-                       np.sum((unprocessed_state[:, :, 2] == 0) | (unprocessed_state[:, :, 2] == 136))
-               ) == unprocessed_state.size
+            np.sum(unprocessed_state[:, :, 0] == 0)
+            + np.sum((unprocessed_state[:, :, 1] == 0) | (unprocessed_state[:, :, 1] == 28))
+            + np.sum((unprocessed_state[:, :, 2] == 0) | (unprocessed_state[:, :, 2] == 136))
+        ) == unprocessed_state.size
 
     def get_face_pixels(self, unprocessed_state):
         return set(zip(*np.where(unprocessed_state[50:, :, 0] == 228)))
@@ -357,11 +359,16 @@ class MyMontezuma(MyWrapper):
 
         if not transition_screen and not ram_transition:
             ram_room = self.ram[ROOM_INDEX]
-            assert self.room == ram_room, f'Incorrect room: room={self.room} ram_room={ram_room} pos={self.x},{self.y}'
+            assert self.room == ram_room, f"Incorrect room: room={self.room} ram_room={ram_room} pos={self.x},{self.y}"
 
         self.cur_score += reward
-        if (not done and not transition_screen and not ram_transition and not self.level_transition and
-                self.room not in self.rooms):
+        if (
+            not done
+            and not transition_screen
+            and not ram_transition
+            and not self.level_transition
+            and self.room not in self.rooms
+        ):
             screen_shot = unprocessed_state[50:].repeat(self.x_repeat, axis=1)
             self.rooms[self.room] = (True, screen_shot)
 
@@ -396,8 +403,18 @@ class MyMontezuma(MyWrapper):
         assert self.pos is not None
         return self.pos
 
-    def render_with_known(self, known_positions, x_res, y_res, show=False, filename=None, combine_val=sum_two,
-                          get_val=lambda x: x.score, minmax=None, log_scale=False):
+    def render_with_known(
+        self,
+        known_positions,
+        x_res,
+        y_res,
+        show=False,
+        filename=None,
+        combine_val=sum_two,
+        get_val=lambda x: x.score,
+        minmax=None,
+        log_scale=False,
+    ):
         height, width = list(self.rooms.values())[0][1].shape[:2]
 
         final_image = np.zeros((height * 4, width * 9, 3), dtype=np.uint8) + 255
@@ -421,7 +438,7 @@ class MyMontezuma(MyWrapper):
             y_room, x_room = room_pos(room)
             y_room *= height
             x_room *= width
-            final_image[y_room:y_room + height, x_room:x_room + width, :] = img
+            final_image[y_room : y_room + height, x_room : x_room + width, :] = img
 
         img = np.zeros((height, width, 3)) + 127
         plt.figure(figsize=(final_image.shape[1] // 30, final_image.shape[0] // 30))
@@ -438,10 +455,20 @@ class MyMontezuma(MyWrapper):
 
             cv2.line(final_image, (x_room, y_room), (x_room, y_room + img.shape[0]), (255, 255, 255), 1)
             cv2.line(final_image, (x_room, y_room), (x_room + img.shape[1], y_room), (255, 255, 255), 1)
-            cv2.line(final_image, (x_room + img.shape[1], y_room), (x_room + img.shape[1], y_room + img.shape[0]),
-                     (255, 255, 255), 1)
-            cv2.line(final_image, (x_room, y_room + img.shape[0]), (x_room + img.shape[1], y_room + img.shape[0]),
-                     (255, 255, 255), 1)
+            cv2.line(
+                final_image,
+                (x_room + img.shape[1], y_room),
+                (x_room + img.shape[1], y_room + img.shape[0]),
+                (255, 255, 255),
+                1,
+            )
+            cv2.line(
+                final_image,
+                (x_room, y_room + img.shape[0]),
+                (x_room + img.shape[1], y_room + img.shape[0]),
+                (255, 255, 255),
+                1,
+            )
 
             for k in known_positions:
                 if k.level == -1:
@@ -462,35 +489,42 @@ class MyMontezuma(MyWrapper):
 
         vals = list(points.values())
         points = list(points.items())
-        plt.scatter([p[0][0] for p in points], [p[0][1] for p in points], c=[p[1] for p in points], cmap='bwr',
-                    s=(min(x_res, y_res)**2) * 0.15, marker='s')
+        plt.scatter(
+            [p[0][0] for p in points],
+            [p[0][1] for p in points],
+            c=[p[1] for p in points],
+            cmap="bwr",
+            s=(min(x_res, y_res) ** 2) * 0.15,
+            marker="s",
+        )
         plt.legend()
 
         import matplotlib.cm
         import matplotlib.colors
         from matplotlib.ticker import ScalarFormatter
+
         if log_scale:
 
             v = np.geomspace(np.min(vals), np.max(vals), 11, endpoint=True)
             mappable = matplotlib.cm.ScalarMappable(
-                norm=matplotlib.colors.LogNorm(vmin=np.min(vals), vmax=np.max(vals)),
-                cmap='bwr')
+                norm=matplotlib.colors.LogNorm(vmin=np.min(vals), vmax=np.max(vals)), cmap="bwr"
+            )
             mappable.set_array(np.array(vals))
-            matplotlib.rcParams.update({'font.size': 22})
+            matplotlib.rcParams.update({"font.size": 22})
             formatter = ScalarFormatter()
             plt.colorbar(mappable, ticks=v, format=formatter)
         else:
             v = np.linspace(np.min(vals), np.max(vals), 11, endpoint=True)
-            mappable = matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(vmin=np.min(vals),
-                                                                                     vmax=np.max(vals)),
-                                                    cmap='bwr')
+            mappable = matplotlib.cm.ScalarMappable(
+                norm=matplotlib.colors.Normalize(vmin=np.min(vals), vmax=np.max(vals)), cmap="bwr"
+            )
             mappable.set_array(np.array(vals))
-            matplotlib.rcParams.update({'font.size': 22})
+            matplotlib.rcParams.update({"font.size": 22})
             plt.colorbar(mappable, ticks=v)
 
-        plt.axis('off')
+        plt.axis("off")
         if filename is not None:
-            plt.savefig(filename, bbox_inches='tight')
+            plt.savefig(filename, bbox_inches="tight")
         if show:
             plt.show()
         else:

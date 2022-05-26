@@ -6,25 +6,28 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import copy
 import collections
+import copy
 import functools
 import warnings as _warnings
 
 try:
-    from dataclasses import dataclass, field as datafield
+    from dataclasses import dataclass
+    from dataclasses import field as datafield
 
     def copyfield(data):
         return datafield(default_factory=lambda: copy.deepcopy(data))
+
 except ImportError:
-    _warnings.warn('dataclasses not found. To get it, use Python 3.7 or pip install dataclasses')
+    _warnings.warn("dataclasses not found. To get it, use Python 3.7 or pip install dataclasses")
     raise
 
-infinity = float('inf')
+infinity = float("inf")
 
 
 def notebook_max_width():
-    from IPython.core.display import display, HTML
+    from IPython.core.display import HTML, display
+
     display(HTML("<style>.container { width:100% !important; }</style>"))
 
 

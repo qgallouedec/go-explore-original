@@ -6,21 +6,23 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
-from gym import spaces
-import multiprocessing as mp
-from typing import Any, List, Tuple, Callable, Dict, Optional
-import random
 import copy
+import logging
+import multiprocessing as mp
+import random
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
 import cv2
-from PIL import Image
-from atari_reset.atari_reset.wrappers import MyWrapper, worker, CloudpickleWrapper, VecWrapper, VideoWriter
+import goexplore_py.globals as global_const
+import goexplore_py.utils as utils
+import numpy as np
+from atari_reset.atari_reset.wrappers import CloudpickleWrapper, MyWrapper, VecWrapper, VideoWriter, worker
 from goexplore_py.data_classes import CellInfoStochastic
 from goexplore_py.goal_representations import AbstractGoalRepresentation
 from goexplore_py.trajectory_trackers import TrajectoryTracker
-import goexplore_py.utils as utils
-import goexplore_py.globals as global_const
-import logging
+from gym import spaces
+from PIL import Image
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +30,7 @@ class GoalConVecFrameStack(VecWrapper):
     """
     Vectorized environment base class
     """
+
     def __init__(self, venv, nstack):
         super(GoalConVecFrameStack, self).__init__(venv)
         self.nstack = nstack
@@ -54,7 +57,7 @@ class GoalConVecFrameStack(VecWrapper):
         for (i, new) in enumerate(news):
             if new:
                 self.stacked_obs[i] = 0
-        self.stacked_obs[..., -obs.shape[-1]:] = obs
+        self.stacked_obs[..., -obs.shape[-1] :] = obs
         obs_and_goals = (self.stacked_obs, goals)
         return obs_and_goals, rews, news, infos
 
@@ -65,7 +68,7 @@ class GoalConVecFrameStack(VecWrapper):
         obs_and_goals = self.venv.reset()
         obs, goals = obs_and_goals
         self.stacked_obs[...] = 0
-        self.stacked_obs[..., -obs.shape[-1]:] = obs
+        self.stacked_obs[..., -obs.shape[-1] :] = obs
         obs_and_goals = (self.stacked_obs, goals)
         return obs_and_goals
 
@@ -86,11 +89,12 @@ class GoalConVecGoalStack(VecWrapper):
     """
     Vectorized environment base class
     """
+
     def __init__(self, venv, goal_rep):
         super(GoalConVecGoalStack, self).__init__(venv)
         observation_space = venv.observation_space
         old_shape = observation_space.low.shape
-        new_shape = old_shape[0:-1] + (old_shape[-1] + goal_rep.shape[-1], )
+        new_shape = old_shape[0:-1] + (old_shape[-1] + goal_rep.shape[-1],)
         filter_shape = old_shape[0:-1] + (goal_rep.shape[-1],)
         sheet = np.zeros(filter_shape, observation_space.low.dtype)
         ob_low = np.concatenate([observation_space.low, sheet], axis=-1)
@@ -139,7 +143,7 @@ def get_neighbor(env, pos, offset, x_range, y_range):
     x = pos.x + offset[0]
     y = pos.y + offset[1]
     room = pos.room
-    room_x, room_y = env.recursive_getattr('get_room_xy')(room)
+    room_x, room_y = env.recursive_getattr("get_room_xy")(room)
     if x < x_range[0]:
         x = x_range[1]
         room_x -= 1
@@ -152,9 +156,9 @@ def get_neighbor(env, pos, offset, x_range, y_range):
     elif y > y_range[1]:
         y = y_range[0]
         room_y += 1
-    if env.recursive_getattr('get_room_out_of_bounds')(room_x, room_y):
+    if env.recursive_getattr("get_room_out_of_bounds")(room_x, room_y):
         return None
-    room = env.recursive_getattr('get_room_from_xy')(room_x, room_y)
+    room = env.recursive_getattr("get_room_from_xy")(room_x, room_y)
     if room == -1:
         return None
     new_pos = copy.copy(pos)
@@ -187,7 +191,7 @@ class GoalExplorer:
             return policy_action
 
     def choose(self, go_explore_env):
-        raise NotImplementedError('GoalExplorers need to implement a choose method.')
+        raise NotImplementedError("GoalExplorers need to implement a choose method.")
 
 
 class DomKnowNeighborGoalExplorer(GoalExplorer):
@@ -197,8 +201,8 @@ class DomKnowNeighborGoalExplorer(GoalExplorer):
         self.y_res = y_res
 
     def choose(self, go_explore_env):
-        width = go_explore_env.env.recursive_getattr('screen_width') * go_explore_env.env.recursive_getattr('x_repeat')
-        height = go_explore_env.env.recursive_getattr('screen_width')
+        width = go_explore_env.env.recursive_getattr("screen_width") * go_explore_env.env.recursive_getattr("x_repeat")
+        height = go_explore_env.env.recursive_getattr("screen_width")
         max_cell_x = int((width - (self.x_res / 2)) / self.x_res)
         max_cell_y = int((height - (self.y_res / 2)) / self.y_res)
         x_range = (0, max_cell_x)
@@ -206,14 +210,12 @@ class DomKnowNeighborGoalExplorer(GoalExplorer):
         possible_neighbors = []
         unknown_neighbors = []
         for offset in [(1, 0), (0, 1), (-1, 0), (0, -1)]:
-            possible_neighbor = get_neighbor(go_explore_env.env,
-                                             go_explore_env.last_reached_cell,
-                                             offset,
-                                             x_range,
-                                             y_range)
+            possible_neighbor = get_neighbor(go_explore_env.env, go_explore_env.last_reached_cell, offset, x_range, y_range)
             if possible_neighbor is not None:
-                if (possible_neighbor not in go_explore_env.archive.archive and
-                        possible_neighbor not in go_explore_env.locally_explored):
+                if (
+                    possible_neighbor not in go_explore_env.archive.archive
+                    and possible_neighbor not in go_explore_env.locally_explored
+                ):
                     unknown_neighbors.append(possible_neighbor)
                 possible_neighbors.append(possible_neighbor)
         if len(unknown_neighbors) > 0 and random.random() > 0.9:
@@ -227,16 +229,17 @@ class DomKnowNeighborGoalExplorer(GoalExplorer):
 
 
 class EntropyManager:
-    def __init__(self,
-                 inc_ent_fac: float,
-                 ret_inc_ent_thresh: int,
-                 expl_inc_ent_thresh: int,
-                 entropy_strategy: str,
-                 ent_inc_power: float,
-                 ret_inc_ent_fac: float,
-                 expl_ent_reset: str,
-                 legacy_entropy: bool
-                 ):
+    def __init__(
+        self,
+        inc_ent_fac: float,
+        ret_inc_ent_thresh: int,
+        expl_inc_ent_thresh: int,
+        entropy_strategy: str,
+        ent_inc_power: float,
+        ret_inc_ent_fac: float,
+        expl_ent_reset: str,
+        legacy_entropy: bool,
+    ):
         #: Specifies how to increase entropy (if at all). Currently implemented are the 'fixed_increase' strategy, which
         #: increase the entropy after a threshold is reached and the 'dynamic_increase' strategy, which slowly increases
         #: entropy after a threshold is reached based on the number of steps taking beyond this threshold. Also
@@ -302,25 +305,25 @@ class EntropyManager:
 
     def get_exploration_entropy(self, env):
         if not self.expl_inc_ent_thresh == -1:
-            if self.expl_ent_reset == 'on_new_cell':
+            if self.expl_ent_reset == "on_new_cell":
                 return self._get_inc_entropy(env.expl_steps_since_new_cell, self.expl_inc_ent_thresh)
-            elif self.expl_ent_reset == 'on_goal_reached':
+            elif self.expl_ent_reset == "on_goal_reached":
                 return self._get_inc_entropy(env.actions_to_goal, self.expl_inc_ent_thresh)
         return 1
 
     def _get_inc_entropy(self, actions_taken, deadline):
         result = 1.0
-        if self.entropy_strategy == 'fixed_increase':
+        if self.entropy_strategy == "fixed_increase":
             if actions_taken > deadline:
                 result = self.inc_ent_fac
-        elif self.entropy_strategy == 'none':
+        elif self.entropy_strategy == "none":
             result = 1.0
-        elif self.entropy_strategy == 'dynamic_increase':
+        elif self.entropy_strategy == "dynamic_increase":
             if actions_taken > deadline:
                 overdue = actions_taken - deadline
                 result = 1 + ((overdue * self.inc_ent_fac) ** self.ent_inc_power)
         else:
-            raise NotImplementedError('Unknown entropy strategy:', self.entropy_strategy)
+            raise NotImplementedError("Unknown entropy strategy:", self.entropy_strategy)
         return result
 
 
@@ -328,29 +331,32 @@ class GoalConGoExploreEnv(MyWrapper):
     """
     Keeps track of the cells and cell representation
     """
-    def __init__(self,
-                 env: Any,
-                 archive: Any,
-                 goal_representation: AbstractGoalRepresentation,
-                 done_on_return: bool,
-                 video_writer: VideoWriter,
-                 goal_explorer: GoalExplorer,
-                 trajectory_tracker: TrajectoryTracker,
-                 entropy_manager: EntropyManager,
-                 max_exploration_steps: int,
-                 on_done_reward: float,
-                 no_exploration_gradients: bool,
-                 game_reward_factor: float,
-                 goal_reward_factor: float,
-                 clip_game_reward: bool,
-                 clip_range: Tuple[float, float],
-                 max_actions_to_goal: int,
-                 max_actions_to_new_cell: int,
-                 cell_reached: Callable[[Any, Any], bool],
-                 cell_selection_modifier: str,
-                 traj_modifier: str,
-                 fail_ent_inc: str,
-                 final_goal_reward: float):
+
+    def __init__(
+        self,
+        env: Any,
+        archive: Any,
+        goal_representation: AbstractGoalRepresentation,
+        done_on_return: bool,
+        video_writer: VideoWriter,
+        goal_explorer: GoalExplorer,
+        trajectory_tracker: TrajectoryTracker,
+        entropy_manager: EntropyManager,
+        max_exploration_steps: int,
+        on_done_reward: float,
+        no_exploration_gradients: bool,
+        game_reward_factor: float,
+        goal_reward_factor: float,
+        clip_game_reward: bool,
+        clip_range: Tuple[float, float],
+        max_actions_to_goal: int,
+        max_actions_to_new_cell: int,
+        cell_reached: Callable[[Any, Any], bool],
+        cell_selection_modifier: str,
+        traj_modifier: str,
+        fail_ent_inc: str,
+        final_goal_reward: float,
+    ):
         super(GoalConGoExploreEnv, self).__init__(env)
 
         # Classes provided to the environment
@@ -470,13 +476,13 @@ class GoalConGoExploreEnv(MyWrapper):
         self.actions_to_goal = 0
         goal_cell_rep = self.archive.cell_selector.choose_cell_key(archive)[0]
         prev_goal_cell_rep = None
-        if self.cell_selection_modifier == 'prev' or self.traj_modifier == 'prev':
+        if self.cell_selection_modifier == "prev" or self.traj_modifier == "prev":
             # Experimental code: instead of always going to the selected cell, sometimes go to cells before the selected
             # cell, in the hopes of finding a better trajectory to the target cell.
             temp_goal_cell_info = archive[goal_cell_rep]
-            trajectory = self.archive.cell_trajectory_manager.get_trajectory(temp_goal_cell_info.cell_traj_id,
-                                                                             temp_goal_cell_info.cell_traj_end,
-                                                                             self.archive.cell_id_to_key_dict)
+            trajectory = self.archive.cell_trajectory_manager.get_trajectory(
+                temp_goal_cell_info.cell_traj_id, temp_goal_cell_info.cell_traj_end, self.archive.cell_id_to_key_dict
+            )
             if len(trajectory) > 0:
                 seen_cells = set()
                 unique_trajectory = []
@@ -494,16 +500,16 @@ class GoalConGoExploreEnv(MyWrapper):
             else:
                 prev_goal_cell_rep = (goal_cell_rep, 0)
 
-        if self.cell_selection_modifier == 'prev':
+        if self.cell_selection_modifier == "prev":
             self.goal_cell_rep = prev_goal_cell_rep[0]
         else:
             self.goal_cell_rep = goal_cell_rep
         self.goal_cell_info = archive[self.goal_cell_rep]
-        if self.traj_modifier == 'prev' and prev_goal_cell_rep[0] != goal_cell_rep:
+        if self.traj_modifier == "prev" and prev_goal_cell_rep[0] != goal_cell_rep:
             temp_goal_cell_info = archive[prev_goal_cell_rep[0]]
-            trajectory = self.archive.cell_trajectory_manager.get_trajectory(temp_goal_cell_info.cell_traj_id,
-                                                                             temp_goal_cell_info.cell_traj_end,
-                                                                             self.archive.cell_id_to_key_dict)
+            trajectory = self.archive.cell_trajectory_manager.get_trajectory(
+                temp_goal_cell_info.cell_traj_id, temp_goal_cell_info.cell_traj_end, self.archive.cell_id_to_key_dict
+            )
             final_cell = trajectory[-1]
             trajectory.pop(-1)
             trajectory.append((final_cell[0], prev_goal_cell_rep[1]))
@@ -511,11 +517,11 @@ class GoalConGoExploreEnv(MyWrapper):
             self.entropy_manager.entropy_cells[final_cell[0]] = goal_cell_rep, (chosen * 0.1) ** 2
             trajectory.append((goal_cell_rep, 1))
         else:
-            trajectory = self.archive.cell_trajectory_manager.get_trajectory(self.goal_cell_info.cell_traj_id,
-                                                                             self.goal_cell_info.cell_traj_end,
-                                                                             self.archive.cell_id_to_key_dict)
+            trajectory = self.archive.cell_trajectory_manager.get_trajectory(
+                self.goal_cell_info.cell_traj_id, self.goal_cell_info.cell_traj_end, self.archive.cell_id_to_key_dict
+            )
 
-        if self.fail_ent_inc == 'time' or self.fail_ent_inc == 'cell':
+        if self.fail_ent_inc == "time" or self.fail_ent_inc == "cell":
             for i, (cell_key, time_spend) in enumerate(trajectory):
                 failed = self.archive.archive[cell_key].nb_sub_goal_failed
                 nb_failures_above_thresh = self.archive.archive[cell_key].nb_failures_above_thresh
@@ -524,7 +530,7 @@ class GoalConGoExploreEnv(MyWrapper):
                     while i - offset < 0:
                         offset = np.random.geometric(0.5) - 1
                     if offset > 0:
-                        if self.fail_ent_inc == 'time':
+                        if self.fail_ent_inc == "time":
                             end_con = np.random.randint(1, 20)
                         else:
                             end_con = cell_key
@@ -537,9 +543,7 @@ class GoalConGoExploreEnv(MyWrapper):
         self.return_goals_info_chosen.append(self.goal_cell_info)
         self.return_goals_reached.append(False)
         self.restored.append(False)
-        self.sub_goal_cell_rep = self.trajectory_tracker.reset(self.current_cell,
-                                                               trajectory,
-                                                               self.goal_cell_rep)
+        self.sub_goal_cell_rep = self.trajectory_tracker.reset(self.current_cell, trajectory, self.goal_cell_rep)
         self.steps_to_previous = 0
         self.steps_to_current = 0
         if self.cell_reached(self.current_cell, self.goal_cell_rep):
@@ -614,10 +618,10 @@ class GoalConGoExploreEnv(MyWrapper):
             if self.steps_to_current != self.trajectory_tracker.get_steps(-1):
                 self.steps_to_previous = self.steps_to_current
                 self.steps_to_current = self.trajectory_tracker.get_steps(-1)
-            self.info['increase_entropy'] = self.entropy_manager.get_return_entropy(self)
-            self.info['exp_strat'] = self.goal_explorer.exploration_strategy
-            self.info['traj_index'] = self.trajectory_tracker.trajectory_index
-            self.info['traj_len'] = len(self.trajectory_tracker.cell_trajectory)
+            self.info["increase_entropy"] = self.entropy_manager.get_return_entropy(self)
+            self.info["exp_strat"] = self.goal_explorer.exploration_strategy
+            self.info["traj_index"] = self.trajectory_tracker.trajectory_index
+            self.info["traj_len"] = len(self.trajectory_tracker.cell_trajectory)
             steps_difference = self.steps_to_current - self.steps_to_previous
             if self.max_actions_to_goal >= 0 and self.actions_to_sub_goal > steps_difference + self.max_actions_to_goal:
                 done = True
@@ -626,11 +630,11 @@ class GoalConGoExploreEnv(MyWrapper):
             reached_goal_reward = 0
             self.exploration_steps += 1
             self.expl_steps_since_new_cell += 1
-            self.info['increase_entropy'] = self.entropy_manager.get_exploration_entropy(self)
+            self.info["increase_entropy"] = self.entropy_manager.get_exploration_entropy(self)
             if self.no_exploration_gradients:
-                self.info['replay_reset.invalid_transition'] = True
-            self.info['overwritten_action'] = action
-            self.info['exp_strat'] = self.goal_explorer.exploration_strategy
+                self.info["replay_reset.invalid_transition"] = True
+            self.info["overwritten_action"] = action
+            self.info["exp_strat"] = self.goal_explorer.exploration_strategy
             if (self.max_actions_to_new_cell >= 0) and (self.expl_steps_since_new_cell > self.max_actions_to_new_cell):
                 done = True
 
@@ -663,20 +667,21 @@ class GoalConGoExploreEnv(MyWrapper):
         # Process the end of an episode
         if done:
             reached_goal_reward += self.on_done_reward
-            ep_info = {'l': self.action_nr,
-                       'r': self.score,
-                       'nb_exploration_goals_reached': self.nb_exploration_goals_reached,
-                       'nb_exploration_goals_chosen': self.nb_exploration_goals_chosen,
-                       'goal_chosen': self.return_goals_chosen[-1],
-                       'reached': self.return_goals_reached[-1],
-                       'sub_goal': self.sub_goal_cell_rep,
-                       'inc_ent': self.entropy_manager.ent_end_cell is not None,
-                       }
-            self.info['episode'] = ep_info
+            ep_info = {
+                "l": self.action_nr,
+                "r": self.score,
+                "nb_exploration_goals_reached": self.nb_exploration_goals_reached,
+                "nb_exploration_goals_chosen": self.nb_exploration_goals_chosen,
+                "goal_chosen": self.return_goals_chosen[-1],
+                "reached": self.return_goals_reached[-1],
+                "sub_goal": self.sub_goal_cell_rep,
+                "inc_ent": self.entropy_manager.ent_end_cell is not None,
+            }
+            self.info["episode"] = ep_info
 
         # New information that needs to be passed every step
-        self.info['cell'] = self.current_cell
-        self.info['game_reward'] = game_reward
+        self.info["cell"] = self.current_cell
+        self.info["game_reward"] = game_reward
 
         goal = self._get_nn_goal_rep()
         obs_and_goal = (obs, goal)
@@ -739,18 +744,18 @@ class RemoteEnv(object):
     def __init__(self, remote):
         self.remote = remote
         self.waiting = False
-        self.remote.send(('get_spaces', None))
+        self.remote.send(("get_spaces", None))
         self.action_space, self.observation_space = self._recv(self.remote)
-        self.remote.send(('recursive_getattr', 'goal_space'))
+        self.remote.send(("recursive_getattr", "goal_space"))
         self.goal_space = self._recv(self.remote)
 
     def step(self, action):
-        self.remote.send(('step', action))
+        self.remote.send(("step", action))
         result = self._recv(self.remote)
         return result
 
     def step_async(self, action):
-        self.remote.send(('step', action))
+        self.remote.send(("step", action))
         self.waiting = True
 
     def step_wait(self):
@@ -759,22 +764,22 @@ class RemoteEnv(object):
         return result
 
     def reset(self):
-        self.remote.send(('reset', None))
+        self.remote.send(("reset", None))
         obs = self._recv(self.remote)
         return obs
 
     def reset_task(self):
-        self.remote.send(('reset_task', None))
+        self.remote.send(("reset_task", None))
         obs = self._recv(self.remote)
         return obs
 
     def get_history(self, nsteps):
-        self.remote.send(('get_history', nsteps))
+        self.remote.send(("get_history", nsteps))
         obs = self._recv(self.remote)
         return obs
 
     def recursive_getattr(self, name):
-        self.remote.send(('recursive_getattr', name))
+        self.remote.send(("recursive_getattr", name))
         obs = self._recv(self.remote)
         return obs
 
@@ -782,14 +787,14 @@ class RemoteEnv(object):
         if hasattr(self, name):
             setattr(self, name, value)
         else:
-            self.remote.send(('recursive_setattr', (name, value)))
+            self.remote.send(("recursive_setattr", (name, value)))
 
     def recursive_call_method(self, name, arguments=()):
         if hasattr(self, name):
             return getattr(self, name)(*arguments)
         else:
             message = (name, arguments)
-            self.remote.send(('recursive_call_method', message))
+            self.remote.send(("recursive_call_method", message))
             return self._recv(self.remote)
 
     def recursive_call_method_ignore_return(self, name, arguments=()):
@@ -797,27 +802,27 @@ class RemoteEnv(object):
             getattr(self, name)(*arguments)
         else:
             message = (name, arguments)
-            self.remote.send(('recursive_call_method_ignore_return', message))
+            self.remote.send(("recursive_call_method_ignore_return", message))
 
     def decrement_starting_point(self, n, idx):
-        self.remote.send(('decrement_starting_point', (n, idx)))
+        self.remote.send(("decrement_starting_point", (n, idx)))
 
     def init_archive(self):
-        self.remote.send(('init_archive', None))
+        self.remote.send(("init_archive", None))
         obs = self._recv(self.remote)
         return obs
 
     def set_archive(self, archive):
-        self.remote.send(('set_archive', archive))
+        self.remote.send(("set_archive", archive))
 
     def set_selector(self, selector):
-        self.remote.send(('set_selector', selector))
+        self.remote.send(("set_selector", selector))
 
     def close(self):
-        self.remote.send(('close', None))
+        self.remote.send(("close", None))
 
     def get_current_cell(self):
-        self.remote.send(('get_current_cell', None))
+        self.remote.send(("get_current_cell", None))
         return self._recv(self.remote)
 
     def _recv(self, remote):
@@ -835,22 +840,24 @@ class GoalConSubprocVecEnv(object):
         nenvs = len(env_fns)
         mp_context = mp.get_context(start_method)
         self.remotes, self.work_remotes = zip(*[mp_context.Pipe(duplex=True) for _ in range(nenvs)])
-        self.ps = [mp_context.Process(target=worker, args=(work_remote, CloudpickleWrapper(env_fn)), daemon=True)
-                   for (work_remote, env_fn) in zip(self.work_remotes, env_fns)]
+        self.ps = [
+            mp_context.Process(target=worker, args=(work_remote, CloudpickleWrapper(env_fn)), daemon=True)
+            for (work_remote, env_fn) in zip(self.work_remotes, env_fns)
+        ]
         for p in self.ps:
             p.start()
         # From this moment on, we have to close the environment in order to let the program end
-        logger.debug(f'[master] sending command: get_spaces')
+        logger.debug(f"[master] sending command: get_spaces")
 
-        self.remotes[0].send(('get_spaces', None))
+        self.remotes[0].send(("get_spaces", None))
         self.action_space, self.observation_space = self._recv(self.remotes[0])
-        self.remotes[0].send(('recursive_getattr', 'goal_space'))
+        self.remotes[0].send(("recursive_getattr", "goal_space"))
         self.goal_space = self._recv(self.remotes[0])
         self.waiting = False
 
     def step(self, actions):
         for remote, action in zip(self.remotes, actions):
-            remote.send(('step', action))
+            remote.send(("step", action))
         results = [self._recv(remote) for remote in self.remotes]
         obs_and_goals, rews, dones, infos = zip(*results)
 
@@ -861,7 +868,7 @@ class GoalConSubprocVecEnv(object):
 
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
-            remote.send(('step', action))
+            remote.send(("step", action))
         self.waiting = True
 
     def step_wait(self):
@@ -876,7 +883,7 @@ class GoalConSubprocVecEnv(object):
 
     def reset(self):
         for remote in self.remotes:
-            remote.send(('reset', None))
+            remote.send(("reset", None))
         obs_and_goals = [self._recv(remote) for remote in self.remotes]
 
         obs, goals = zip(*obs_and_goals)
@@ -886,7 +893,7 @@ class GoalConSubprocVecEnv(object):
 
     def reset_task(self):
         for remote in self.remotes:
-            remote.send(('reset_task', None))
+            remote.send(("reset_task", None))
         obs_and_goals = [self._recv(remote) for remote in self.remotes]
 
         obs, goals = zip(*obs_and_goals)
@@ -896,7 +903,7 @@ class GoalConSubprocVecEnv(object):
 
     def get_history(self, nsteps):
         for remote in self.remotes:
-            remote.send(('get_history', nsteps))
+            remote.send(("get_history", nsteps))
         results = [self._recv(remote) for remote in self.remotes]
         obs_and_goals, acts, dones = zip(*results)
         obs, goals = obs_and_goals
@@ -910,7 +917,7 @@ class GoalConSubprocVecEnv(object):
             return getattr(self, name)
         else:
             for remote in self.remotes:
-                remote.send(('recursive_getattr', name))
+                remote.send(("recursive_getattr", name))
             return [self._recv(remote) for remote in self.remotes]
 
     def recursive_setattr(self, name, value):
@@ -918,26 +925,26 @@ class GoalConSubprocVecEnv(object):
             setattr(self, name, value)
         else:
             for remote in self.remotes:
-                remote.send(('recursive_setattr', (name, value)))
+                remote.send(("recursive_setattr", (name, value)))
 
     def recursive_call_method(self, name, arguments=()):
         message = (name, arguments)
         for remote in self.remotes:
-            remote.send(('recursive_call_method', message))
+            remote.send(("recursive_call_method", message))
         response = [self._recv(remote) for remote in self.remotes]
         return response
 
     def recursive_call_method_ignore_return(self, name, arguments=()):
         message = (name, arguments)
         for remote in self.remotes:
-            remote.send(('recursive_call_method_ignore_return', message))
+            remote.send(("recursive_call_method_ignore_return", message))
 
     def decrement_starting_point(self, n, idx):
         for remote in self.remotes:
-            remote.send(('decrement_starting_point', (n, idx)))
+            remote.send(("decrement_starting_point", (n, idx)))
 
     def init_archive(self):
-        self.remotes[0].send(('init_archive', None))
+        self.remotes[0].send(("init_archive", None))
         archive = self._recv(self.remotes[0])
         self.set_archive(archive.archive)
         self.set_selector(archive.cell_selector)
@@ -945,15 +952,15 @@ class GoalConSubprocVecEnv(object):
 
     def set_archive(self, archive):
         for remote in self.remotes:
-            remote.send(('set_archive', archive))
+            remote.send(("set_archive", archive))
 
     def set_selector(self, selector):
         for remote in self.remotes:
-            remote.send(('set_selector', selector))
+            remote.send(("set_selector", selector))
 
     def close(self):
         for remote in self.remotes:
-            remote.send(('close', None))
+            remote.send(("close", None))
         for p in self.ps:
             p.join()
 
@@ -979,9 +986,8 @@ class SquareGreyFrame(MyWrapper):
         self.observation_space = spaces.Box(low=0, high=255, shape=(self.res, self.res, 1), dtype=np.uint8)
 
     def reshape_obs(self, obs):
-        obs = np.dot(obs.astype('float32'), np.array([0.299, 0.587, 0.114], 'float32'))
-        obs = np.array(Image.fromarray(obs).resize((self.res, self.res),
-                                                   resample=Image.BILINEAR), dtype=np.uint8)
+        obs = np.dot(obs.astype("float32"), np.array([0.299, 0.587, 0.114], "float32"))
+        obs = np.array(Image.fromarray(obs).resize((self.res, self.res), resample=Image.BILINEAR), dtype=np.uint8)
         return obs.reshape((self.res, self.res, 1))
 
     def reset(self):
@@ -1001,9 +1007,8 @@ class RectGreyFrame(MyWrapper):
         self.observation_space = spaces.Box(low=0, high=255, shape=self.net_res, dtype=np.uint8)
 
     def reshape_obs(self, obs):
-        obs = np.dot(obs.astype('float32'), np.array([0.299, 0.587, 0.114], 'float32'))
-        obs = np.array(Image.fromarray(obs).resize((self.res[0], self.res[1]),
-                                                   resample=Image.BILINEAR), dtype=np.uint8)
+        obs = np.dot(obs.astype("float32"), np.array([0.299, 0.587, 0.114], "float32"))
+        obs = np.array(Image.fromarray(obs).resize((self.res[0], self.res[1]), resample=Image.BILINEAR), dtype=np.uint8)
         return np.expand_dims(obs, -1)
 
     def reset(self):
@@ -1023,8 +1028,7 @@ class RectColorFrame(MyWrapper):
         self.observation_space = spaces.Box(low=0, high=255, shape=self.net_res, dtype=np.uint8)
 
     def reshape_obs(self, obs):
-        obs = np.array(Image.fromarray(obs).resize((self.res[0], self.res[1]),
-                                                   resample=Image.BILINEAR), dtype=np.uint8)
+        obs = np.array(Image.fromarray(obs).resize((self.res[0], self.res[1]), resample=Image.BILINEAR), dtype=np.uint8)
         return obs
 
     def reset(self):
@@ -1040,6 +1044,7 @@ class RectColorFrameWithBug(MyWrapper):
     This is from the OpenAI implementation, but it seems to contain a bug which incorrectly aligns columns and rows,
     causing pixels to get scrambled.
     """
+
     def __init__(self, env):
         """Warp frames to 105x80"""
         MyWrapper.__init__(self, env)
@@ -1047,8 +1052,7 @@ class RectColorFrameWithBug(MyWrapper):
         self.observation_space = spaces.Box(low=0, high=255, shape=self.res, dtype=np.uint8)
 
     def reshape_obs(self, obs):
-        obs = np.array(Image.fromarray(obs).resize((self.res[0], self.res[1]),
-                                                   resample=Image.BILINEAR), dtype=np.uint8)
+        obs = np.array(Image.fromarray(obs).resize((self.res[0], self.res[1]), resample=Image.BILINEAR), dtype=np.uint8)
         return obs.reshape(self.res)
 
     def reset(self):
@@ -1068,7 +1072,7 @@ class SilEnv(MyWrapper):
         elif nb_channels == 3:
             self.image_format = cv2.IMREAD_COLOR
         else:
-            raise Exception('Unsupported number of channels:' + str(nb_channels))
+            raise Exception("Unsupported number of channels:" + str(nb_channels))
         self.sil_on = False
         self.sil_initial_action = None
         self.sil_initial_observation = None
@@ -1099,11 +1103,13 @@ class SilEnv(MyWrapper):
 
             value = self.get_value(self.sil_rewards[current_step:])
 
-            info = {'cell': self.sil_cells[current_step],
-                    'game_reward': self.sil_game_rewards[current_step],
-                    'sil_action': self.sil_actions[current_step],
-                    'sil_value': value,
-                    'replay_reset.invalid_transition': self.sil_invalid}
+            info = {
+                "cell": self.sil_cells[current_step],
+                "game_reward": self.sil_game_rewards[current_step],
+                "sil_action": self.sil_actions[current_step],
+                "sil_value": value,
+                "replay_reset.invalid_transition": self.sil_invalid,
+            }
             return self.decompress(self.sil_observations[current_step]), self.sil_rewards[current_step], done, info
 
     def decompress(self, obs_and_goal):
@@ -1148,8 +1154,9 @@ class SilEnv(MyWrapper):
                 cell_key, reward, obs_and_goal, action, ge_reward = data
                 obs = obs_and_goal[0]
 
-                sub_goal_cell_rep, reached_goal_reward, sub_goal_reached = self.trajectory_tracker.step(cell_key,
-                                                                                                        goal_cell_rep)
+                sub_goal_cell_rep, reached_goal_reward, sub_goal_reached = self.trajectory_tracker.step(
+                    cell_key, goal_cell_rep
+                )
 
                 goal = self.goal_representation.get(cell_key, goal_cell_rep, sub_goal_cell_rep)
 

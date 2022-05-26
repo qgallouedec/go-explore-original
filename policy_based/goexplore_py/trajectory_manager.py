@@ -6,16 +6,18 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Dict, Tuple, Any, Set, Optional
-from .data_classes import dataclass, copyfield
-import sys
-import random
 import copy
-import tensorflow as tf
-import numpy as np
-import goexplore_py.globals as global_const
-import pickle
 import os
+import pickle
+import random
+import sys
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import goexplore_py.globals as global_const
+import numpy as np
+import tensorflow as tf
+
+from .data_classes import copyfield, dataclass
 
 
 @dataclass
@@ -43,11 +45,12 @@ class FullTrajectoryInfo:
 class CellTrajectoryManager:
     empty_trajectory_id = -1
 
-    def __init__(self, sil, cell_class, sess=None, temp_dir='', low_prob_traj_tresh=1/10000):
+    def __init__(self, sil, cell_class, sess=None, temp_dir="", low_prob_traj_tresh=1 / 10000):
         # Cell trajectory information
         self.cell_trajectories: Dict[int, CellTrajectory] = {}
-        self.full_trajectories: Dict[int, List[Tuple[Any, np.float32, Tuple[np.ndarray, np.ndarray], np.int64,
-                                                     np.float32]]] = {}
+        self.full_trajectories: Dict[
+            int, List[Tuple[Any, np.float32, Tuple[np.ndarray, np.ndarray], np.int64, np.float32]]
+        ] = {}
         self.full_trajectory_info: Dict[int, FullTrajectoryInfo] = {}
         self.traj_prob_dict: Optional[Dict[int, float]] = None
 
@@ -93,17 +96,17 @@ class CellTrajectoryManager:
         goal_shape = goal_representation.get_goal_space().shape
 
         header_feature = {
-            'trajectory_id': tf.io.FixedLenFeature([], tf.int64),
-            'trajectory_length': tf.io.FixedLenFeature([], tf.int64),
+            "trajectory_id": tf.io.FixedLenFeature([], tf.int64),
+            "trajectory_length": tf.io.FixedLenFeature([], tf.int64),
         }
 
         body_feature = {
-            'cell_key': tf.io.FixedLenFeature([self.cell_class.array_length], tf.int64),
-            'reward': tf.io.FixedLenFeature([], tf.float32),
-            'obs': tf.io.FixedLenFeature([], tf.string),
-            'goal': tf.io.FixedLenFeature(goal_shape, tf.float32),
-            'action': tf.io.FixedLenFeature([], tf.int64),
-            'ge_reward': tf.io.FixedLenFeature([], tf.float32),
+            "cell_key": tf.io.FixedLenFeature([self.cell_class.array_length], tf.int64),
+            "reward": tf.io.FixedLenFeature([], tf.float32),
+            "obs": tf.io.FixedLenFeature([], tf.string),
+            "goal": tf.io.FixedLenFeature(goal_shape, tf.float32),
+            "action": tf.io.FixedLenFeature([], tf.int64),
+            "ge_reward": tf.io.FixedLenFeature([], tf.float32),
         }
 
         dataset = tf.data.TFRecordDataset(filename)
@@ -114,7 +117,7 @@ class CellTrajectoryManager:
 
         self.read_header_feature = tf.io.parse_single_example(get_next, header_feature)
         self.read_body_feature = tf.io.parse_single_example(get_next, body_feature)
-        self.get_obs = tf.expand_dims(tf.decode_raw(self.read_body_feature['obs'], out_type=tf.int8), axis=1)
+        self.get_obs = tf.expand_dims(tf.decode_raw(self.read_body_feature["obs"], out_type=tf.int8), axis=1)
 
     def run_load_op(self):
         nb_traj_tuples = 0
@@ -126,31 +129,31 @@ class CellTrajectoryManager:
             if nb_traj_tuples == 0:
                 trajectories_loaded += 1
                 if trajectories_loaded % 100 == 0:
-                    print(f'Trajectories loaded: {trajectories_loaded}/{total_trajectories}')
+                    print(f"Trajectories loaded: {trajectories_loaded}/{total_trajectories}")
                 self.write_low_prob_traj_to_disk(traj_id)
                 try:
                     header = self.sess.run(self.read_header_feature)
                 except tf.errors.OutOfRangeError:
                     break
 
-                nb_traj_tuples = header['trajectory_length']
-                traj_id = int(np.copy(header['trajectory_id']))
+                nb_traj_tuples = header["trajectory_length"]
+                traj_id = int(np.copy(header["trajectory_id"]))
                 self.set_full_trajectory(traj_id)
             else:
                 body, obs = self.sess.run([self.read_body_feature, self.get_obs])
                 nb_traj_tuples -= 1
-                cell_key_state = body['cell_key']
-                reward = body['reward']
+                cell_key_state = body["cell_key"]
+                reward = body["reward"]
                 obs = obs
-                goal = body['goal']
-                action = body['action']
-                ge_reward = body['ge_reward']
+                goal = body["goal"]
+                action = body["action"]
+                ge_reward = body["ge_reward"]
 
                 cell_key = self.cell_class()
                 cell_key.__setstate__(tuple(cell_key_state))
 
                 self.full_trajectories[traj_id].append((cell_key, reward, (obs, goal), action, ge_reward))
-        print(f'Trajectories loaded: {trajectories_loaded}/{total_trajectories}')
+        print(f"Trajectories loaded: {trajectories_loaded}/{total_trajectories}")
 
     def dump(self, filename):
         writer = tf.python_io.TFRecordWriter(filename)
@@ -158,10 +161,7 @@ class CellTrajectoryManager:
             full_trajectory = self.get_full_trajectory(key)
             trajectory_id = tf.train.Feature(int64_list=tf.train.Int64List(value=[key]))
             trajectory_length = tf.train.Feature(int64_list=tf.train.Int64List(value=[len(full_trajectory)]))
-            feature_map = {
-                'trajectory_id': trajectory_id,
-                'trajectory_length': trajectory_length
-            }
+            feature_map = {"trajectory_id": trajectory_id, "trajectory_length": trajectory_length}
             combined_features = tf.train.Features(feature=feature_map)
             example = tf.train.Example(features=combined_features)
             writer.write(example.SerializeToString())
@@ -176,12 +176,12 @@ class CellTrajectoryManager:
                 action_f = tf.train.Feature(int64_list=tf.train.Int64List(value=[action]))
                 ge_reward_f = tf.train.Feature(float_list=tf.train.FloatList(value=[ge_reward]))
                 feature = {
-                    'cell_key': cell_key_f,
-                    'reward': reward_f,
-                    'obs': obs_f,
-                    'goal': goal_f,
-                    'action': action_f,
-                    'ge_reward': ge_reward_f,
+                    "cell_key": cell_key_f,
+                    "reward": reward_f,
+                    "obs": obs_f,
+                    "goal": goal_f,
+                    "action": action_f,
+                    "ge_reward": ge_reward_f,
                 }
                 example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
                 writer.write(example_proto.SerializeToString())
@@ -189,17 +189,19 @@ class CellTrajectoryManager:
         writer.close()
 
     def get_state(self):
-        state = {'cell_trajectories': self.cell_trajectories,
-                 'del_policy_new_cells': self.del_policy_new_cells,
-                 'del_rand_new_cells': self.del_rand_new_cells,
-                 'del_ret_new_cells': self.del_ret_new_cells}
+        state = {
+            "cell_trajectories": self.cell_trajectories,
+            "del_policy_new_cells": self.del_policy_new_cells,
+            "del_rand_new_cells": self.del_rand_new_cells,
+            "del_ret_new_cells": self.del_ret_new_cells,
+        }
         return state
 
     def set_state(self, state):
-        self.cell_trajectories = state['cell_trajectories']
-        self.del_policy_new_cells = state['del_policy_new_cells']
-        self.del_rand_new_cells = state['del_rand_new_cells']
-        self.del_ret_new_cells = state['del_ret_new_cells']
+        self.cell_trajectories = state["cell_trajectories"]
+        self.del_policy_new_cells = state["del_policy_new_cells"]
+        self.del_rand_new_cells = state["del_rand_new_cells"]
+        self.del_ret_new_cells = state["del_ret_new_cells"]
 
         # Create an updated trajectory fragment for every trajectory so that the information will be updated in
         # sub-processes
@@ -217,8 +219,8 @@ class CellTrajectoryManager:
         for traj_key in trajectory_fragments:
             trajectory_fragment = trajectory_fragments[traj_key]
             if traj_key not in self.cell_trajectories:
-                assert trajectory_fragment.fragment_start == 0, 'error in trajectory: ' + str(trajectory_fragment)
-                assert trajectory_fragment.reference_count == 0, 'error in trajectory: ' + str(trajectory_fragment)
+                assert trajectory_fragment.fragment_start == 0, "error in trajectory: " + str(trajectory_fragment)
+                assert trajectory_fragment.reference_count == 0, "error in trajectory: " + str(trajectory_fragment)
                 self.cell_trajectories[traj_key] = trajectory_fragment
                 self.increment_reference(traj_key)
                 if trajectory_fragment.finished:
@@ -260,7 +262,7 @@ class CellTrajectoryManager:
         self.cell_trajectory_id = trajectory_id
 
     def _start_trajectory(self, trajectory_id):
-        assert trajectory_id not in self.updated_trajectory_fragments, 'Traj. id ' + str(trajectory_id) + ' reused!'
+        assert trajectory_id not in self.updated_trajectory_fragments, "Traj. id " + str(trajectory_id) + " reused!"
         trajectory = CellTrajectory()
         trajectory.id = trajectory_id
         trajectory.tie_breaker = random.random()
@@ -271,7 +273,7 @@ class CellTrajectoryManager:
     def update_trajectory(self, cell_id: int, reward, obs, goal, action, ge_reward, cell_key, exp_strat, new_cell):
         # Get the current trajectory
         trajectory = self.cell_trajectories[self.cell_trajectory_id]
-        assert not trajectory.finished, 'Finished trajectories should not be updated! Trajectory' + str(trajectory)
+        assert not trajectory.finished, "Finished trajectories should not be updated! Trajectory" + str(trajectory)
 
         # Get the current trajectory fragment
         if self.cell_trajectory_id not in self.updated_trajectory_fragments:
@@ -316,7 +318,7 @@ class CellTrajectoryManager:
         trajectory_fragment.exp_new_cells = trajectory.exp_new_cells
         trajectory_fragment.ret_new_cells = trajectory.ret_new_cells
 
-        if self.sil == 'sil' or self.sil == 'replay' or self.sil == 'nosil':
+        if self.sil == "sil" or self.sil == "replay" or self.sil == "nosil":
             if self.cell_trajectory_id not in self.full_trajectories:
                 self.set_full_trajectory(self.cell_trajectory_id)
             self.full_trajectories[self.cell_trajectory_id].append((cell_key, reward, (obs, goal), action, ge_reward))
@@ -354,7 +356,7 @@ class CellTrajectoryManager:
             return
         self.cell_trajectories[cell_trajectory_id].reference_count -= 1
         if self.cell_trajectories[cell_trajectory_id].reference_count <= 0:
-            assert self.cell_trajectories[cell_trajectory_id].finished, 'Unfinished trajectories should not be deleted!'
+            assert self.cell_trajectories[cell_trajectory_id].finished, "Unfinished trajectories should not be deleted!"
             self.del_ret_new_cells += self.cell_trajectories[cell_trajectory_id].ret_new_cells
             if self.cell_trajectories[cell_trajectory_id].exp_strat == global_const.EXP_STRAT_POLICY:
                 self.del_policy_new_cells += self.cell_trajectories[cell_trajectory_id].exp_new_cells
@@ -395,8 +397,10 @@ class CellTrajectoryManager:
         result = []
         if cell_trajectory_id == self.empty_trajectory_id:
             return result
-        for cell_id, nb_actions in zip(self.cell_trajectories[cell_trajectory_id].cell_ids[0:trajectory_end],
-                                       self.cell_trajectories[cell_trajectory_id].actions_per_cell[0:trajectory_end]):
+        for cell_id, nb_actions in zip(
+            self.cell_trajectories[cell_trajectory_id].cell_ids[0:trajectory_end],
+            self.cell_trajectories[cell_trajectory_id].actions_per_cell[0:trajectory_end],
+        ):
             result.append((cell_key_dict[cell_id], nb_actions))
         return result
 
@@ -420,7 +424,7 @@ class CellTrajectoryManager:
         if cell_trajectory_id == self.empty_trajectory_id:
             return result
         if cell_trajectory_id not in self.full_trajectory_info:
-            raise KeyError(str(cell_trajectory_id) + ' not in trajectory manager')
+            raise KeyError(str(cell_trajectory_id) + " not in trajectory manager")
         if self.full_trajectory_info[cell_trajectory_id].on_disk:
             self.read_full_trajectory_from_disk(cell_trajectory_id)
         if trajectory_end == -1:
@@ -430,7 +434,7 @@ class CellTrajectoryManager:
         return result
 
     def get_full_trajectory_file_name(self, cell_trajectory_id):
-        file_name = str(cell_trajectory_id) + '_traj.pkl'
+        file_name = str(cell_trajectory_id) + "_traj.pkl"
         path_to_file = os.path.join(self.temp_dir, file_name)
         return path_to_file
 
@@ -448,7 +452,7 @@ class CellTrajectoryManager:
 
     def write_full_trajectory_to_disk(self, cell_trajectory_id):
         full_trajectory = self.full_trajectories[cell_trajectory_id]
-        with open(self.get_full_trajectory_file_name(cell_trajectory_id), 'wb') as fh:
+        with open(self.get_full_trajectory_file_name(cell_trajectory_id), "wb") as fh:
             pickle.dump(len(full_trajectory), fh)
             for item in full_trajectory:
                 pickle.dump(item, fh)
@@ -456,7 +460,7 @@ class CellTrajectoryManager:
         self.full_trajectory_info[cell_trajectory_id].on_disk = True
 
     def read_full_trajectory_from_disk(self, cell_trajectory_id):
-        with open(self.get_full_trajectory_file_name(cell_trajectory_id), 'rb') as fh:
+        with open(self.get_full_trajectory_file_name(cell_trajectory_id), "rb") as fh:
             unpickle = pickle.Unpickler(fh)
             nb_items = unpickle.load()
             data = []
@@ -466,40 +470,44 @@ class CellTrajectoryManager:
         self.full_trajectory_info[cell_trajectory_id].on_disk = False
 
     def __getstate__(self):
-        return (self.cell_trajectories,
-                self.full_trajectories,
-                self.full_trajectory_info,
-                self.traj_prob_dict,
-                self.del_ret_new_cells,
-                self.del_policy_new_cells,
-                self.del_rand_new_cells,
-                self.cell_trajectory_id,
-                self.updated_trajectory_fragments,
-                self.synced_trajectories,
-                self.new_trajectories,
-                self.cells_seen,
-                self.sil,
-                self.keep_new_trajectories,
-                self.low_prob_traj_tresh,
-                self.temp_dir)
+        return (
+            self.cell_trajectories,
+            self.full_trajectories,
+            self.full_trajectory_info,
+            self.traj_prob_dict,
+            self.del_ret_new_cells,
+            self.del_policy_new_cells,
+            self.del_rand_new_cells,
+            self.cell_trajectory_id,
+            self.updated_trajectory_fragments,
+            self.synced_trajectories,
+            self.new_trajectories,
+            self.cells_seen,
+            self.sil,
+            self.keep_new_trajectories,
+            self.low_prob_traj_tresh,
+            self.temp_dir,
+        )
 
     def __setstate__(self, state):
-        (self.cell_trajectories,
-         self.full_trajectories,
-         self.full_trajectory_info,
-         self.traj_prob_dict,
-         self.del_ret_new_cells,
-         self.del_policy_new_cells,
-         self.del_rand_new_cells,
-         self.cell_trajectory_id,
-         self.updated_trajectory_fragments,
-         self.synced_trajectories,
-         self.new_trajectories,
-         self.cells_seen,
-         self.sil,
-         self.keep_new_trajectories,
-         self.low_prob_traj_tresh,
-         self.temp_dir) = state
+        (
+            self.cell_trajectories,
+            self.full_trajectories,
+            self.full_trajectory_info,
+            self.traj_prob_dict,
+            self.del_ret_new_cells,
+            self.del_policy_new_cells,
+            self.del_rand_new_cells,
+            self.cell_trajectory_id,
+            self.updated_trajectory_fragments,
+            self.synced_trajectories,
+            self.new_trajectories,
+            self.cells_seen,
+            self.sil,
+            self.keep_new_trajectories,
+            self.low_prob_traj_tresh,
+            self.temp_dir,
+        ) = state
 
         # We do not serialize Tensorflow operations or sessions
         self.read_header_feature = None

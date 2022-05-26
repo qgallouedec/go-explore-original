@@ -1,32 +1,36 @@
 """
 // Modifications Copyright (c) 2020 Uber Technologies Inc.
 """
+import copy
+import logging
 import os
-import random
 import pickle
-import gym
+import random
+import warnings as _warnings
 from collections import deque
-from PIL import Image
-from gym import spaces
+from multiprocessing import Pipe, Process
+
+import cloudpickle
+import cv2
+import goexplore_py.mpi_support as mpi
+import gym
+import horovod.tensorflow as hvd
 import imageio
 import numpy as np
-from multiprocessing import Process, Pipe
-import horovod.tensorflow as hvd
-import copy
-import warnings as _warnings
-import cv2
-import cloudpickle
-import goexplore_py.mpi_support as mpi
-import logging
+from gym import spaces
+from PIL import Image
+
 logger = logging.getLogger(__name__)
 
 try:
-    from dataclasses import dataclass, field as datafield
+    from dataclasses import dataclass
+    from dataclasses import field as datafield
 
     def copyfield(data):
         return datafield(default_factory=lambda: copy.deepcopy(data))
+
 except ModuleNotFoundError:
-    _warnings.warn('dataclasses not found. To get it, use Python 3.7 or pip install dataclasses')
+    _warnings.warn("dataclasses not found. To get it, use Python 3.7 or pip install dataclasses")
 
 reset_for_batch = False
 
@@ -59,7 +63,7 @@ class VecWrapper(object):
             try:
                 return self.venv.recursive_getattr(name)
             except AttributeError:
-                raise Exception(f'Couldn\'t get attr: {name}')
+                raise Exception(f"Couldn't get attr: {name}")
 
     def recursive_setattr(self, name, value):
         if hasattr(self, name):
@@ -68,7 +72,7 @@ class VecWrapper(object):
             try:
                 return self.venv.recursive_setattr(name, value)
             except AttributeError:
-                raise Exception(f'Couldn\'t set attr: {name}')
+                raise Exception(f"Couldn't set attr: {name}")
 
     def recursive_call_method(self, name, arguments=()):
         if hasattr(self, name):
@@ -77,7 +81,7 @@ class VecWrapper(object):
             try:
                 return self.venv.recursive_call_method(name, arguments)
             except AttributeError:
-                raise Exception(f'Couldn\'t call method: {name}')
+                raise Exception(f"Couldn't call method: {name}")
 
     def recursive_call_method_ignore_return(self, name, arguments=()):
         if hasattr(self, name):
@@ -86,7 +90,7 @@ class VecWrapper(object):
             try:
                 self.venv.recursive_call_method_ignore_return(name, arguments)
             except AttributeError:
-                raise Exception(f'Couldn\'t call method: {name}')
+                raise Exception(f"Couldn't call method: {name}")
 
     def batch_reset(self):
         global reset_for_batch
@@ -139,8 +143,14 @@ class MyWrapper(gym.Wrapper):
         @param item:
         @return:
         """
-        raise AttributeError('Could not find ' + item + ' in ' + self.__class__.__name__ + '. ' +
-                             '__getattr__ is not (and should not be) implemented in MyWrapper')
+        raise AttributeError(
+            "Could not find "
+            + item
+            + " in "
+            + self.__class__.__name__
+            + ". "
+            + "__getattr__ is not (and should not be) implemented in MyWrapper"
+        )
 
     def decrement_starting_point(self, nr_steps, idx):
         return self.env.decrement_starting_point(nr_steps, idx)
@@ -162,7 +172,7 @@ class MyWrapper(gym.Wrapper):
             try:
                 return self.env.recursive_getattr(name)
             except AttributeError:
-                raise Exception(f'Couldn\'t get attr: {name}')
+                raise Exception(f"Couldn't get attr: {name}")
 
     def recursive_setattr(self, name, value):
         if hasattr(self, name):
@@ -171,7 +181,7 @@ class MyWrapper(gym.Wrapper):
             try:
                 return self.env.recursive_setattr(name, value)
             except AttributeError:
-                raise Exception(f'Couldn\'t set attr: {name}')
+                raise Exception(f"Couldn't set attr: {name}")
 
     def recursive_call_method(self, name, arguments=()):
         if hasattr(self, name):
@@ -180,7 +190,7 @@ class MyWrapper(gym.Wrapper):
             try:
                 return self.env.recursive_call_method(name, arguments)
             except AttributeError:
-                raise Exception(f'Couldn\'t call method: {name}')
+                raise Exception(f"Couldn't call method: {name}")
 
     def recursive_call_method_ignore_return(self, name, arguments=()):
         if hasattr(self, name):
@@ -189,7 +199,7 @@ class MyWrapper(gym.Wrapper):
             try:
                 self.env.recursive_call_method_ignore_return(name, arguments)
             except AttributeError:
-                raise Exception(f'Couldn\'t call method: {name}')
+                raise Exception(f"Couldn't call method: {name}")
 
     def batch_reset(self):
         global reset_for_batch
@@ -231,13 +241,14 @@ class VecFrameStack(VecWrapper):
     """
     Vectorized environment base class
     """
+
     def __init__(self, venv, nstack):
         super(VecFrameStack, self).__init__(venv)
         self.nstack = nstack
         wos = venv.observation_space  # wrapped ob space
         low = np.repeat(wos.low, self.nstack, axis=-1)
         high = np.repeat(wos.high, self.nstack, axis=-1)
-        self.stackedobs = np.zeros((venv.num_envs,)+low.shape, low.dtype)
+        self.stackedobs = np.zeros((venv.num_envs,) + low.shape, low.dtype)
         self._observation_space = spaces.Box(low=low, high=high)
         self._action_space = venv.action_space
         self._goal_space = venv.goal_space
@@ -253,7 +264,7 @@ class VecFrameStack(VecWrapper):
         for (i, new) in enumerate(news):
             if new:
                 self.stackedobs[i] = 0
-        self.stackedobs[..., -obs.shape[-1]:] = obs
+        self.stackedobs[..., -obs.shape[-1] :] = obs
         return self.stackedobs, rews, news, infos
 
     def reset(self):
@@ -262,7 +273,7 @@ class VecFrameStack(VecWrapper):
         """
         obs = self.venv.reset()
         self.stackedobs[...] = 0
-        self.stackedobs[..., -obs.shape[-1]:] = obs
+        self.stackedobs[..., -obs.shape[-1] :] = obs
         return self.stackedobs
 
     @property
@@ -291,7 +302,7 @@ class VecFrameStack(VecWrapper):
             try:
                 return self.venv.recursive_getattr(name)
             except AttributeError:
-                raise Exception(f'Couldn\'t get attr: {name}')
+                raise Exception(f"Couldn't get attr: {name}")
 
     def set_archive(self, archive):
         return self.venv.set_archive(archive)
@@ -313,13 +324,13 @@ class DemoReplayInfo:
         else:
             with open(demo_file_name, "rb") as f:
                 dat = pickle.load(f)
-            self.actions = dat['actions']
-            rewards = dat['rewards']
+            self.actions = dat["actions"]
+            rewards = dat["rewards"]
             assert len(rewards) == len(self.actions)
             self.returns = np.cumsum(rewards)
-            self.checkpoints = dat['checkpoints']
-            self.checkpoint_action_nr = dat['checkpoint_action_nr']
-            self.starting_point = len(self.actions) - 1 - seed//workers_per_sp
+            self.checkpoints = dat["checkpoints"]
+            self.checkpoint_action_nr = dat["checkpoint_action_nr"]
+            self.starting_point = len(self.actions) - 1 - seed // workers_per_sp
             self.starting_point_current_ep = None
 
 
@@ -328,20 +339,22 @@ class ReplayResetEnv(MyWrapper):
     Randomly resets to states from a replay
     """
 
-    def __init__(self,
-                 env,
-                 demo_file_name,
-                 seed,
-                 reset_steps_ignored=64,
-                 workers_per_sp=4,
-                 frac_sample=0.2,
-                 game_over_on_life_loss=True,
-                 allowed_lag=50,
-                 allowed_score_deficit=0,
-                 test_from_start=False,
-                 from_start_prior=0,
-                 demo_selection='uniform',
-                 avg_frames_window_size=0):
+    def __init__(
+        self,
+        env,
+        demo_file_name,
+        seed,
+        reset_steps_ignored=64,
+        workers_per_sp=4,
+        frac_sample=0.2,
+        game_over_on_life_loss=True,
+        allowed_lag=50,
+        allowed_score_deficit=0,
+        test_from_start=False,
+        from_start_prior=0,
+        demo_selection="uniform",
+        avg_frames_window_size=0,
+    ):
         super(ReplayResetEnv, self).__init__(env)
         self.rng = np.random.RandomState(seed)
         self.reset_steps_ignored = reset_steps_ignored
@@ -356,7 +369,8 @@ class ReplayResetEnv(MyWrapper):
             self.demo_replay_info.append(DemoReplayInfo(None, seed, workers_per_sp))
         if os.path.isdir(demo_file_name):
             import glob
-            for f in sorted(glob.glob(demo_file_name + '/*.demo')):
+
+            for f in sorted(glob.glob(demo_file_name + "/*.demo")):
                 self.demo_replay_info.append(DemoReplayInfo(f, seed, workers_per_sp))
         else:
             self.demo_replay_info.append(DemoReplayInfo(demo_file_name, seed, workers_per_sp))
@@ -381,11 +395,11 @@ class ReplayResetEnv(MyWrapper):
                 self.steps_taken_per_demo[i, 0] = 1
 
     def recursive_getattr(self, name):
-        prefix = 'starting_point_'
-        if name[:len(prefix)] == prefix:
-            idx = int(name[len(prefix):])
+        prefix = "starting_point_"
+        if name[: len(prefix)] == prefix:
+            idx = int(name[len(prefix) :])
             return self.demo_replay_info[idx].starting_point
-        elif name == 'n_demos':
+        elif name == "n_demos":
             return len(self.demo_replay_info)
         else:
             return super(ReplayResetEnv, self).recursive_getattr(name)
@@ -404,7 +418,7 @@ class ReplayResetEnv(MyWrapper):
             valid = True
         prev_lives = self.env.unwrapped.ale.lives()
         obs, reward, done, info = self.env.step(action)
-        info['idx'] = self.cur_demo_idx
+        info["idx"] = self.cur_demo_idx
         self.steps_taken_per_demo[self.cur_demo_idx, self._get_window_index()] += 1
         self.action_nr += 1
         self.score += reward
@@ -422,7 +436,7 @@ class ReplayResetEnv(MyWrapper):
             self.extra_frames_counter -= 1
             if self.extra_frames_counter <= 0:
                 done = True
-                info['replay_reset.random_reset'] = True  # to distinguish from actual game over
+                info["replay_reset.random_reset"] = True  # to distinguish from actual game over
         elif self.action_nr > self.allowed_lag:
             min_index = self.action_nr - self.allowed_lag
             if min_index < 0:
@@ -430,25 +444,26 @@ class ReplayResetEnv(MyWrapper):
             if min_index >= len(self.cur_demo_replay.returns):
                 min_index = len(self.cur_demo_replay.returns) - 1
             max_index = self.action_nr + self.allowed_lag
-            threshold = min(self.cur_demo_replay.returns[min_index: max_index]) - self.allowed_score_deficit
+            threshold = min(self.cur_demo_replay.returns[min_index:max_index]) - self.allowed_score_deficit
             if self.score < threshold:
                 done = True
 
         # output flag to increase entropy if near the starting point of this episode
         if self.action_nr < self.cur_demo_replay.starting_point + 100:
-            info['increase_entropy'] = True
+            info["increase_entropy"] = True
 
         if done:
-            ep_info = {'l': self.action_nr,
-                       'as_good_as_demo': (self.score >=
-                                           (self.cur_demo_replay.returns[-1] - self.allowed_score_deficit)),
-                       'r': self.score,
-                       'starting_point': self.cur_demo_replay.starting_point_current_ep,
-                       'idx': self.cur_demo_idx}
-            info['episode'] = ep_info
+            ep_info = {
+                "l": self.action_nr,
+                "as_good_as_demo": (self.score >= (self.cur_demo_replay.returns[-1] - self.allowed_score_deficit)),
+                "r": self.score,
+                "starting_point": self.cur_demo_replay.starting_point_current_ep,
+                "idx": self.cur_demo_idx,
+            }
+            info["episode"] = ep_info
 
         if not valid:
-            info['replay_reset.invalid_transition'] = True
+            info["replay_reset.invalid_transition"] = True
 
         return obs, reward, done, info
 
@@ -460,7 +475,7 @@ class ReplayResetEnv(MyWrapper):
     def reset(self):
         obs = self.env.reset()
         # noinspection PyArgumentList
-        self.extra_frames_counter = int(np.exp(self.rng.rand()*7))
+        self.extra_frames_counter = int(np.exp(self.rng.rand() * 7))
 
         # Select demo
         ones = np.ones(len(self.demo_replay_info))
@@ -469,12 +484,12 @@ class ReplayResetEnv(MyWrapper):
             norm = np.where(norm > self.avg_frames_window_size, self.avg_frames_window_size, norm)
         expected_steps = np.sum(self.steps_taken_per_demo, axis=1) / norm
         inverse_expected = 1 / expected_steps
-        if self.demo_selection == 'normalize_from_start':
+        if self.demo_selection == "normalize_from_start":
             logits = inverse_expected
             logits[1:] = np.mean(logits[1:])
-        elif self.demo_selection == 'normalize':
+        elif self.demo_selection == "normalize":
             logits = inverse_expected
-        elif self.demo_selection == 'uniform':
+        elif self.demo_selection == "uniform":
             logits = ones
         else:
             raise NotImplementedError(f"Unknown operation: {self.demo_selection}")
@@ -504,24 +519,25 @@ class ReplayResetEnv(MyWrapper):
             self.score = self.cur_demo_replay.returns[0]
         else:
             # noinspection PyArgumentList
-            if self.rng.rand() <= 1.-self.frac_sample:
+            if self.rng.rand() <= 1.0 - self.frac_sample:
                 self.cur_demo_replay.starting_point_current_ep = self.cur_demo_replay.starting_point
             else:
                 self.cur_demo_replay.starting_point_current_ep = self.rng.randint(
-                    low=self.cur_demo_replay.starting_point, high=len(self.cur_demo_replay.actions))
+                    low=self.cur_demo_replay.starting_point, high=len(self.cur_demo_replay.actions)
+                )
 
             start_action_nr = 0
             start_ckpt = None
-            for nr, ckpt in zip(self.cur_demo_replay.checkpoint_action_nr[::-1],
-                                self.cur_demo_replay.checkpoints[::-1]):
+            for nr, ckpt in zip(self.cur_demo_replay.checkpoint_action_nr[::-1], self.cur_demo_replay.checkpoints[::-1]):
                 if nr <= (self.cur_demo_replay.starting_point_current_ep - self.reset_steps_ignored):
                     start_action_nr = nr
                     start_ckpt = ckpt
                     break
             if start_action_nr > 0:
                 self.env.unwrapped.restore_state(start_ckpt)
-            nr_to_start_lstm = np.maximum(self.cur_demo_replay.starting_point_current_ep - self.reset_steps_ignored,
-                                          start_action_nr)
+            nr_to_start_lstm = np.maximum(
+                self.cur_demo_replay.starting_point_current_ep - self.reset_steps_ignored, start_action_nr
+            )
             if nr_to_start_lstm > start_action_nr:
                 for a in self.cur_demo_replay.actions[start_action_nr:nr_to_start_lstm]:
                     # noinspection PyProtectedMember
@@ -555,12 +571,12 @@ class MaxAndSkipEnv(MyWrapper):
         """Repeat action, sum reward, and max over last observations."""
         total_reward = 0.0
         done = None
-        combined_info = {'skip_env.executed_actions': []}
+        combined_info = {"skip_env.executed_actions": []}
         for _ in range(self._skip):
             obs, reward, done, info = self.env.step(action)
             self._obs_buffer.append(obs)
             total_reward += reward
-            combined_info['skip_env.executed_actions'].append(info['sticky_env.executed_action'])
+            combined_info["skip_env.executed_actions"].append(info["sticky_env.executed_action"])
             combined_info.update(info)
             if done:
                 break
@@ -597,7 +613,7 @@ class ScaledRewardEnv(MyWrapper):
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
-        reward = reward*self.scale
+        reward = reward * self.scale
         return obs, reward, done, info
 
 
@@ -624,7 +640,7 @@ class StickyActionEnv(MyWrapper):
             action = self.last_action
         self.last_action = action
         obs, reward, done, info = self.env.step(action)
-        info['sticky_env.executed_action'] = action
+        info["sticky_env.executed_action"] = action
         return obs, reward, done, info
 
     def reset(self):
@@ -636,7 +652,7 @@ class FireResetEnv(MyWrapper):
     def __init__(self, env):
         """Take action on reset for environments that are fixed until firing."""
         MyWrapper.__init__(self, env)
-        assert env.unwrapped.get_action_meanings()[1] == 'FIRE'
+        assert env.unwrapped.get_action_meanings()[1] == "FIRE"
         assert len(env.unwrapped.get_action_meanings()) >= 3
 
     def reset(self):
@@ -675,18 +691,22 @@ class PreventSlugEnv(MyWrapper):
 
 
 class VideoWriter(MyWrapper):
-    def __init__(self, env, file_prefix,
-                 plot_goal=False,
-                 x_res=16,
-                 y_res=16,
-                 plot_archive=False,
-                 plot_return_prob=True,
-                 one_vid_per_goal=False,
-                 make_video=False,
-                 directory='.',
-                 pixel_repetition=1,
-                 plot_grid=True,
-                 plot_sub_goal=True):
+    def __init__(
+        self,
+        env,
+        file_prefix,
+        plot_goal=False,
+        x_res=16,
+        y_res=16,
+        plot_archive=False,
+        plot_return_prob=True,
+        one_vid_per_goal=False,
+        make_video=False,
+        directory=".",
+        pixel_repetition=1,
+        plot_grid=True,
+        plot_sub_goal=True,
+    ):
         MyWrapper.__init__(self, env)
         self.file_prefix = file_prefix
         self.video_writer = None
@@ -747,12 +767,12 @@ class VideoWriter(MyWrapper):
         current_cell = self.goal_conditioned_wrapper.archive.get_cell_from_env(self.goal_conditioned_wrapper.env)
         if self.plot_archive:
             for cell_key in self.local_archive:
-                if self.match_attr(cell_key, current_cell, 'level') and self.match_attr(cell_key, current_cell, 'room'):
+                if self.match_attr(cell_key, current_cell, "level") and self.match_attr(cell_key, current_cell, "room"):
                     base_brightness = 50
                     if self.plot_return_prob:
                         reached = self.goal_conditioned_wrapper.archive.cells_reached_dict.get(cell_key, [])
                         if len(reached) > 0:
-                            r = base_brightness + (255 - base_brightness) * (sum(reached)/len(reached))
+                            r = base_brightness + (255 - base_brightness) * (sum(reached) / len(reached))
                         else:
                             r = base_brightness
                         color = (0, r, 100)
@@ -764,7 +784,7 @@ class VideoWriter(MyWrapper):
         if self.plot_goal:
             goal = self.goal_conditioned_wrapper.goal_cell_rep
             if goal is not None:
-                if self.match_attr(goal, current_cell, 'level') and self.match_attr(goal, current_cell, 'room'):
+                if self.match_attr(goal, current_cell, "level") and self.match_attr(goal, current_cell, "room"):
                     self._render_cell(f_out, goal, (255, 0, 0))
 
         if self.plot_cell_traj:
@@ -783,10 +803,10 @@ class VideoWriter(MyWrapper):
         if self.plot_sub_goal:
             goal = self.goal_conditioned_wrapper.sub_goal_cell_rep
             if goal is not None:
-                if self.match_attr(goal, current_cell, 'level') and self.match_attr(goal, current_cell, 'room'):
+                if self.match_attr(goal, current_cell, "level") and self.match_attr(goal, current_cell, "room"):
                     self._render_cell(f_out, goal, (255, 255, 0), overlay=f_overlay)
         for cell in self.goal_conditioned_wrapper.entropy_manager.entropy_cells:
-            if self.match_attr(cell, current_cell, 'level') and self.match_attr(cell, current_cell, 'room'):
+            if self.match_attr(cell, current_cell, "level") and self.match_attr(cell, current_cell, "room"):
                 self._render_cell(f_out, cell, (255, 0, 255))
 
         cv2.addWeighted(f_overlay, 0.5, f_out, 0.5, 0, f_out)
@@ -795,14 +815,14 @@ class VideoWriter(MyWrapper):
         f_out = f_out.repeat(self.pixel_repetition, axis=1)
 
         if self.draw_text:
-            if 'increase_entropy' in self.goal_conditioned_wrapper.info:
-                text = str(self.goal_conditioned_wrapper.info['increase_entropy'])
+            if "increase_entropy" in self.goal_conditioned_wrapper.info:
+                text = str(self.goal_conditioned_wrapper.info["increase_entropy"])
                 f_out = cv2.putText(f_out, text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
             text = str(self.goal_conditioned_wrapper.total_reward)
             f_out = cv2.putText(f_out, text, (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
         if self.frames_as_images:
-            filename = self.current_file_name + f'_{self.cur_step:0>3}.png'
+            filename = self.current_file_name + f"_{self.cur_step:0>3}.png"
             im = Image.fromarray(f_out)
             im.save(filename)
         return f_out
@@ -840,7 +860,7 @@ class VideoWriter(MyWrapper):
                 self.num_frames = 0
                 os.makedirs(self.directory, exist_ok=True)
                 self.current_file_name = self._get_file_name()
-                self.video_writer = imageio.get_writer(self.current_file_name, mode='I', fps=30)
+                self.video_writer = imageio.get_writer(self.current_file_name, mode="I", fps=30)
             else:
                 self.video_writer = None
         else:
@@ -855,28 +875,28 @@ class VideoWriter(MyWrapper):
             self.video_writer.close()
             if self.make_video and self.num_frames > self.min_video_length:
                 self.goals_processed.add(self.goal)
-                print('Score achieved:', self.recursive_getattr('cur_score'))
-                print('Video for goal:', self.goal, 'is considered finished.')
+                print("Score achieved:", self.recursive_getattr("cur_score"))
+                print("Video for goal:", self.goal, "is considered finished.")
             else:
-                print('Video for goal:', self.goal, 'considered too short, deleting...')
+                print("Video for goal:", self.goal, "considered too short, deleting...")
                 os.remove(self.current_file_name)
             self.counter += 1
 
     def _get_file_name(self):
         goal = self.goal_conditioned_wrapper.goal_cell_rep
         info = self.goal_conditioned_wrapper.goal_cell_info
-        print('Starting video for goal:', goal, info)
+        print("Starting video for goal:", goal, info)
         rand_val = random.randint(0, 1000000)
         if goal is not None:
-            if hasattr(goal, 'level'):
-                postfix = f'_{goal.level}_{goal.room}_{goal.objects}_{goal.y:0>2}_{goal.x:0>2}_{self.counter}.mp4'
+            if hasattr(goal, "level"):
+                postfix = f"_{goal.level}_{goal.room}_{goal.objects}_{goal.y:0>2}_{goal.x:0>2}_{self.counter}.mp4"
                 name = self.file_prefix + postfix
-            elif hasattr(goal, 'treasures'):
-                name = self.file_prefix + f'_{goal.treasures}_{goal.room}_{goal.y:0>2}_{goal.x:0>2}_{self.counter}.mp4'
+            elif hasattr(goal, "treasures"):
+                name = self.file_prefix + f"_{goal.treasures}_{goal.room}_{goal.y:0>2}_{goal.x:0>2}_{self.counter}.mp4"
             else:
-                name = self.file_prefix + f'_{rand_val}.mp4'
+                name = self.file_prefix + f"_{rand_val}.mp4"
         else:
-            name = self.file_prefix + f'_{rand_val}.mp4'
+            name = self.file_prefix + f"_{rand_val}.mp4"
         return name
 
 
@@ -893,8 +913,8 @@ class NoopEnv(MyWrapper):
         self.noop_actions_taken = []
         for _ in range(noops):
             obs, _, done, info = self.env.step(0)
-            if 'sticky_env.executed_action' in info:
-                self.noop_actions_taken.append(info['sticky_env.executed_action'])
+            if "sticky_env.executed_action" in info:
+                self.noop_actions_taken.append(info["sticky_env.executed_action"])
             else:
                 self.noop_actions_taken.append(0)
             if done:
@@ -906,15 +926,17 @@ class NoopEnv(MyWrapper):
         return obs
 
 
-def my_wrapper(env,
-               clip_rewards=True,
-               frame_resize_wrapper=None,
-               scale_rewards=None,
-               ignore_negative_rewards=False,
-               sticky=True,
-               skip=4,
-               noops=False):
-    assert 'NoFrameskip' in env.spec.id
+def my_wrapper(
+    env,
+    clip_rewards=True,
+    frame_resize_wrapper=None,
+    scale_rewards=None,
+    ignore_negative_rewards=False,
+    sticky=True,
+    skip=4,
+    noops=False,
+):
+    assert "NoFrameskip" in env.spec.id
     assert not (clip_rewards and scale_rewards), "Clipping and scaling rewards makes no sense"
     if scale_rewards is not None:
         env = ScaledRewardEnv(env, scale_rewards)
@@ -927,7 +949,7 @@ def my_wrapper(env,
     if ignore_negative_rewards:
         env = IgnoreNegativeRewardEnv(env)
     env = MaxAndSkipEnv(env, skip=skip)
-    if 'Pong' in env.spec.id:
+    if "Pong" in env.spec.id:
         env = FireResetEnv(env)
     env = frame_resize_wrapper(env)
     return env
@@ -937,21 +959,21 @@ class ResetDemoInfo:
     def __init__(self, env, idx):
         self.env = env
         self.idx = idx
-        starting_points = self.env.recursive_getattr(f'starting_point_{idx}')
+        starting_points = self.env.recursive_getattr(f"starting_point_{idx}")
         all_starting_points = flatten_lists(mpi.COMM_WORLD.allgather(starting_points))
         self.min_starting_point = min(all_starting_points)
         self.max_starting_point = max(all_starting_points)
         self.nrstartsteps = (self.max_starting_point - self.min_starting_point) + 1
-        assert (self.nrstartsteps >= 1)
+        assert self.nrstartsteps >= 1
         self.max_max_starting_point = self.max_starting_point
-        self.starting_point_success = np.zeros(self.max_starting_point+10000)
+        self.starting_point_success = np.zeros(self.max_starting_point + 10000)
         self.infos = []
 
 
 class ResetManager(MyWrapper):
     def __init__(self, env, move_threshold=0.2, steps_per_demo=1024):
         super(ResetManager, self).__init__(env)
-        self.n_demos = self.recursive_getattr('n_demos')[0]
+        self.n_demos = self.recursive_getattr("n_demos")[0]
         self.demos = [ResetDemoInfo(self.env, idx) for idx in range(self.n_demos)]
         self.counter = 0
         self.move_threshold = move_threshold
@@ -959,7 +981,7 @@ class ResetManager(MyWrapper):
 
     def proc_infos(self):
         for idx in range(self.n_demos):
-            epinfos = [info['episode'] for info in self.demos[idx].infos if 'episode' in info]
+            epinfos = [info["episode"] for info in self.demos[idx].infos if "episode" in info]
 
             if hvd.size() > 1:
                 epinfos = flatten_lists(mpi.COMM_WORLD.allgather(epinfos))
@@ -967,36 +989,36 @@ class ResetManager(MyWrapper):
             new_sp_wins = {}
             new_sp_counts = {}
             for epinfo in epinfos:
-                sp = epinfo['starting_point']
+                sp = epinfo["starting_point"]
                 if sp in new_sp_counts:
                     new_sp_counts[sp] += 1
-                    if epinfo['as_good_as_demo']:
+                    if epinfo["as_good_as_demo"]:
                         new_sp_wins[sp] += 1
                 else:
                     new_sp_counts[sp] = 1
-                    if epinfo['as_good_as_demo']:
+                    if epinfo["as_good_as_demo"]:
                         new_sp_wins[sp] = 1
                     else:
                         new_sp_wins[sp] = 0
 
             for sp, wins in new_sp_wins.items():
-                self.demos[idx].starting_point_success[sp] = np.cast[np.float32](wins)/new_sp_counts[sp]
+                self.demos[idx].starting_point_success[sp] = np.cast[np.float32](wins) / new_sp_counts[sp]
 
             # move starting point, ensuring at least 20% of workers are able to complete the demo
-            csd = np.argwhere(np.cumsum(self.demos[idx].starting_point_success) /
-                              self.demos[idx].nrstartsteps >= self.move_threshold)
+            csd = np.argwhere(
+                np.cumsum(self.demos[idx].starting_point_success) / self.demos[idx].nrstartsteps >= self.move_threshold
+            )
             if len(csd) > 0:
                 new_max_start = csd[0][0]
             else:
-                new_max_start = np.minimum(self.demos[idx].max_starting_point + 100,
-                                           self.demos[idx].max_max_starting_point)
+                new_max_start = np.minimum(self.demos[idx].max_starting_point + 100, self.demos[idx].max_max_starting_point)
             n_points_to_shift = self.demos[idx].max_starting_point - new_max_start
             self.decrement_starting_point(n_points_to_shift, idx)
             self.demos[idx].infos = []
 
     def decrement_starting_point(self, n_points_to_shift, idx):
         self.env.decrement_starting_point(n_points_to_shift, idx)
-        starting_points = self.env.recursive_getattr(f'starting_point_{idx}')
+        starting_points = self.env.recursive_getattr(f"starting_point_{idx}")
         all_starting_points = flatten_lists(mpi.COMM_WORLD.allgather(starting_points))
         self.demos[idx].max_starting_point = max(all_starting_points)
 
@@ -1007,20 +1029,24 @@ class ResetManager(MyWrapper):
     def step(self, action):
         obs, rews, news, infos = self.env.step(action)
         for info in infos:
-            self.demos[info['idx']].infos.append(info)
+            self.demos[info["idx"]].infos.append(info)
         self.counter += 1
-        if (self.counter > (self.demos[0].max_max_starting_point - self.demos[0].max_starting_point) / 2 and
-                self.counter % (self.steps_per_demo * self.n_demos) == 0):
+        if (
+            self.counter > (self.demos[0].max_max_starting_point - self.demos[0].max_starting_point) / 2
+            and self.counter % (self.steps_per_demo * self.n_demos) == 0
+        ):
             self.proc_infos()
         return obs, rews, news, infos
 
     def step_wait(self):
         obs, rews, news, infos = self.env.step_wait()
         for info in infos:
-            self.demos[info['idx']].infos.append(info)
+            self.demos[info["idx"]].infos.append(info)
         self.counter += 1
-        if self.counter > (self.demos[0].max_max_starting_point - self.demos[0].max_starting_point) / 2 and \
-                self.counter % (self.steps_per_demo * self.n_demos) == 0:
+        if (
+            self.counter > (self.demos[0].max_max_starting_point - self.demos[0].max_starting_point) / 2
+            and self.counter % (self.steps_per_demo * self.n_demos) == 0
+        ):
             self.proc_infos()
         return obs, rews, news, infos
 
@@ -1034,51 +1060,51 @@ def worker(remote, env_fn_wrapper):
     try:
         while True:
             cmd, data = remote.recv()
-            logger.debug(f'[{os.getpid()}] received command: {cmd}')
-            if cmd == 'step':
+            logger.debug(f"[{os.getpid()}] received command: {cmd}")
+            if cmd == "step":
                 ob, reward, done, info = env.step(data)
                 if done:
                     ob = env.reset()
-                    if 'skip_env.executed_actions' in info:
-                        info['skip_env.executed_actions'].append(-1)
-                        info['skip_env.executed_actions'].append(env.recursive_getattr('noop_actions_taken'))
+                    if "skip_env.executed_actions" in info:
+                        info["skip_env.executed_actions"].append(-1)
+                        info["skip_env.executed_actions"].append(env.recursive_getattr("noop_actions_taken"))
                 remote.send((ob, reward, done, info))
-            elif cmd == 'reset':
+            elif cmd == "reset":
                 ob = env.reset()
                 remote.send(ob)
-            elif cmd == 'close':
+            elif cmd == "close":
                 env.close()
                 remote.close()
                 break
-            elif cmd == 'get_spaces':
+            elif cmd == "get_spaces":
                 remote.send((env.action_space, env.observation_space))
-            elif cmd == 'get_goal_space':
-                remote.send(env.recursive_getattr('goal_space'))
-            elif cmd == 'get_history':
+            elif cmd == "get_goal_space":
+                remote.send(env.recursive_getattr("goal_space"))
+            elif cmd == "get_history":
                 senv = env
-                while not hasattr(senv, 'get_history'):
+                while not hasattr(senv, "get_history"):
                     senv = senv.env
                 remote.send(senv.get_history(data))
-            elif cmd == 'recursive_getattr':
+            elif cmd == "recursive_getattr":
                 remote.send(env.recursive_getattr(data))
-            elif cmd == 'recursive_setattr':
+            elif cmd == "recursive_setattr":
                 env.recursive_setattr(*data)
-            elif cmd == 'print_data':
-                remote.send('done')
-            elif cmd == 'recursive_call_method':
+            elif cmd == "print_data":
+                remote.send("done")
+            elif cmd == "recursive_call_method":
                 remote.send(env.recursive_call_method(*data))
-            elif cmd == 'recursive_call_method_ignore_return':
+            elif cmd == "recursive_call_method_ignore_return":
                 env.recursive_call_method_ignore_return(*data)
-            elif cmd == 'decrement_starting_point':
+            elif cmd == "decrement_starting_point":
                 env.decrement_starting_point(*data)
-            elif cmd == 'get_current_cell':
+            elif cmd == "get_current_cell":
                 cell = env.get_current_cell()
                 remote.send(cell)
-            elif cmd == 'set_archive':
+            elif cmd == "set_archive":
                 env.set_archive(data)
-            elif cmd == 'set_selector':
+            elif cmd == "set_selector":
                 env.set_selector(data)
-            elif cmd == 'init_archive':
+            elif cmd == "init_archive":
                 archive = env.init_archive()
                 remote.send(archive)
             else:
@@ -1093,6 +1119,7 @@ class CloudpickleWrapper(object):
     """
     Uses cloudpickle to serialize contents (otherwise multiprocessing tries to use pickle)
     """
+
     def __init__(self, x):
         self.x = x
 
@@ -1110,20 +1137,22 @@ class SubprocVecEnv(object):
         """
         nenvs = len(env_fns)
         self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
-        self.ps = [Process(target=worker, args=(work_remote, CloudpickleWrapper(env_fn)))
-                   for (work_remote, env_fn) in zip(self.work_remotes, env_fns)]
+        self.ps = [
+            Process(target=worker, args=(work_remote, CloudpickleWrapper(env_fn)))
+            for (work_remote, env_fn) in zip(self.work_remotes, env_fns)
+        ]
         for p in self.ps:
             p.start()
 
-        self.remotes[0].send(('get_spaces', None))
+        self.remotes[0].send(("get_spaces", None))
         self.action_space, self.observation_space = self.remotes[0].recv()
-        self.remotes[0].send(('recursive_getattr', 'goal_space'))
+        self.remotes[0].send(("recursive_getattr", "goal_space"))
         self.goal_space = self.remotes[0].recv()
         self.waiting = False
 
     def step(self, actions):
         for remote, action in zip(self.remotes, actions):
-            remote.send(('step', action))
+            remote.send(("step", action))
         results = [remote.recv() for remote in self.remotes]
         obs, rews, dones, infos = zip(*results)
 
@@ -1131,7 +1160,7 @@ class SubprocVecEnv(object):
 
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
-            remote.send(('step', action))
+            remote.send(("step", action))
         self.waiting = True
 
     def step_wait(self):
@@ -1142,17 +1171,17 @@ class SubprocVecEnv(object):
 
     def reset(self):
         for remote in self.remotes:
-            remote.send(('reset', None))
+            remote.send(("reset", None))
         return np.stack([remote.recv() for remote in self.remotes])
 
     def reset_task(self):
         for remote in self.remotes:
-            remote.send(('reset_task', None))
+            remote.send(("reset_task", None))
         return np.stack([remote.recv() for remote in self.remotes])
 
     def get_history(self, nsteps):
         for remote in self.remotes:
-            remote.send(('get_history', nsteps))
+            remote.send(("get_history", nsteps))
         results = [remote.recv() for remote in self.remotes]
         obs, acts, dones = zip(*results)
         obs = np.stack(obs)
@@ -1162,24 +1191,24 @@ class SubprocVecEnv(object):
 
     def recursive_getattr(self, name):
         for remote in self.remotes:
-            remote.send(('recursive_getattr', name))
+            remote.send(("recursive_getattr", name))
         return [remote.recv() for remote in self.remotes]
 
     def decrement_starting_point(self, n, idx):
         for remote in self.remotes:
-            remote.send(('decrement_starting_point', (n, idx)))
+            remote.send(("decrement_starting_point", (n, idx)))
 
     def set_archive(self, archive):
         for remote in self.remotes:
-            remote.send(('set_archive', archive))
+            remote.send(("set_archive", archive))
 
     def set_selector(self, selector):
         for remote in self.remotes:
-            remote.send(('set_selector', selector))
+            remote.send(("set_selector", selector))
 
     def close(self):
         for remote in self.remotes:
-            remote.send(('close', None))
+            remote.send(("close", None))
         for p in self.ps:
             p.join()
 
@@ -1206,15 +1235,16 @@ class NoopResetEnv(gym.Wrapper):
         self.rewards = []
         self.actions = []
         self.rng = np.random.RandomState(os.getpid())
-        assert env.unwrapped.get_action_meanings()[0] == 'NOOP'
+        assert env.unwrapped.get_action_meanings()[0] == "NOOP"
 
     def choose_noops(self):
         n_done = []
         for i in range(0, 31):
-            json_path = self.save_path + '/' + str(i) + '.json'
+            json_path = self.save_path + "/" + str(i) + ".json"
             n_data = 0
             try:
                 import json
+
                 n_data = len(json.load(open(json_path)))
             except FileNotFoundError:
                 pass
@@ -1225,10 +1255,10 @@ class NoopResetEnv(gym.Wrapper):
         if div == 0:
             weights = np.array([1 for _ in n_done])
             div = np.sum(weights)
-        return np.random.choice(list(range(len(n_done))), p=weights/div)
+        return np.random.choice(list(range(len(n_done))), p=weights / div)
 
     def reset(self, **kwargs):
-        """ Do no-op action for a number of steps in [1, noop_max]."""
+        """Do no-op action for a number of steps in [1, noop_max]."""
         noops = self.choose_noops()
         obs = self.env.reset(**kwargs)
         assert noops >= 0
@@ -1248,6 +1278,7 @@ class NoopResetEnv(gym.Wrapper):
     def step(self, ac):
         a, reward, done, c = self.env.step(ac)
         from collections import Counter
+
         in_treasure = Counter(a[:, :, 2].flatten()).get(136, 0) > 20_000
         if self.in_treasure and not in_treasure:
             self.levels += 1
@@ -1259,17 +1290,18 @@ class NoopResetEnv(gym.Wrapper):
         self.score += reward
 
         if self.save_path and done:
-            json_path = self.save_path + '/' + str(self.cur_noops) + '.json'
-            if 'episode' not in c:
-                c['episode'] = {}
-            if 'write_to_json' not in c['episode']:
-                c['episode']['write_to_json'] = []
-                c['episode']['json_path'] = json_path
-            c['episode']['l'] = len(self.actions)
-            c['episode']['r'] = self.score
-            c['episode']['as_good_as_demo'] = False
-            c['episode']['starting_point'] = 0
-            c['episode']['idx'] = 0
-            c['episode']['write_to_json'].append({'score': self.score, 'levels': self.levels,
-                                                  'actions': [int(e) for e in self.actions]})
+            json_path = self.save_path + "/" + str(self.cur_noops) + ".json"
+            if "episode" not in c:
+                c["episode"] = {}
+            if "write_to_json" not in c["episode"]:
+                c["episode"]["write_to_json"] = []
+                c["episode"]["json_path"] = json_path
+            c["episode"]["l"] = len(self.actions)
+            c["episode"]["r"] = self.score
+            c["episode"]["as_good_as_demo"] = False
+            c["episode"]["starting_point"] = 0
+            c["episode"]["idx"] = 0
+            c["episode"]["write_to_json"].append(
+                {"score": self.score, "levels": self.levels, "actions": [int(e) for e in self.actions]}
+            )
         return a, reward, done, c

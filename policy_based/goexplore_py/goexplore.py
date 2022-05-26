@@ -6,15 +6,16 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import horovod.tensorflow as hvd
-from atari_reset.atari_reset.ppo import flatten_lists
-import goexplore_py.mpi_support as mpi
 import sys
-from types import ModuleType, FunctionType
-from gc import get_referents
-import goexplore_py.globals as global_const
-import numpy as np
 import time
+from gc import get_referents
+from types import FunctionType, ModuleType
+
+import goexplore_py.globals as global_const
+import goexplore_py.mpi_support as mpi
+import horovod.tensorflow as hvd
+import numpy as np
+from atari_reset.atari_reset.ppo import flatten_lists
 
 # Custom objects know their class.
 # Function objects seem to know way too much, including modules.
@@ -25,7 +26,7 @@ BLACKLIST = type, ModuleType, FunctionType
 def getsize(obj):
     """sum size of object & members."""
     if isinstance(obj, BLACKLIST):
-        raise TypeError('getsize() does not take argument of type: ' + str(type(obj)))
+        raise TypeError("getsize() does not take argument of type: " + str(type(obj)))
     seen_ids = set()
     size = 0
     objects = [obj]
@@ -45,8 +46,7 @@ def getsize(obj):
 
 
 class Explore:
-    def __init__(self, trajectory_gatherer=None, archive=None, sil='none', max_traj_candidates=1,
-                 exchange_sil_traj='none'):
+    def __init__(self, trajectory_gatherer=None, archive=None, sil="none", max_traj_candidates=1, exchange_sil_traj="none"):
         self.archive = archive
         self.frames_compute = 0
         self.start = None
@@ -91,7 +91,7 @@ class Explore:
         else:
             to_send = [to_send]
 
-        self.trajectory_gatherer.env.recursive_call_method_ignore_return('update_archive', (to_send,))
+        self.trajectory_gatherer.env.recursive_call_method_ignore_return("update_archive", (to_send,))
 
         # Do not process our own information
         del to_send[hvd.rank()]
@@ -100,24 +100,26 @@ class Explore:
     def get_state(self):
         archive_state = self.archive.get_state()
         gatherer_state = self.trajectory_gatherer.get_state()
-        state = {'archive_state': archive_state,
-                 'gatherer_state': gatherer_state,
-                 'frames_compute': self.frames_compute,
-                 'cycles': self.cycles}
+        state = {
+            "archive_state": archive_state,
+            "gatherer_state": gatherer_state,
+            "frames_compute": self.frames_compute,
+            "cycles": self.cycles,
+        }
         return state
 
     def set_state(self, state):
-        self.archive.set_state(state['archive_state'])
-        self.trajectory_gatherer.set_state(state['gatherer_state'])
-        self.frames_compute = state['frames_compute']
-        self.cycles = state['cycles']
+        self.archive.set_state(state["archive_state"])
+        self.trajectory_gatherer.set_state(state["gatherer_state"])
+        self.frames_compute = state["frames_compute"]
+        self.cycles = state["cycles"]
 
         # Send loaded information to sub-processes
         new_cell_trajectory_info = self.archive.cell_trajectory_manager.get_info_to_sync()
         new_archive_info = self.archive.get_info_to_sync()
         new_archive_info = (self.archive.cell_id_to_key_dict, new_archive_info[1], new_archive_info[2], set())
         to_send = [(new_cell_trajectory_info, new_archive_info)]
-        self.trajectory_gatherer.env.recursive_call_method('update_archive', (to_send,))
+        self.trajectory_gatherer.env.recursive_call_method("update_archive", (to_send,))
 
         # Mark all loaded information as synced
         self.archive.clear_info_to_sync()
@@ -150,7 +152,7 @@ class Explore:
         return owner
 
     def process_requests(self, requests, write_to_disk=False):
-        ready_message = 'r'
+        ready_message = "r"
         for traj_requester, traj_id, traj_owner in requests:
             if hvd.rank() == traj_owner and traj_requester is not None:
                 # Wait until the receiver is ready to receive the message
@@ -169,7 +171,7 @@ class Explore:
         self.archive.cell_trajectory_manager.write_low_prob_traj_to_disk(traj_id)
 
     def sync_before_checkpoint(self):
-        if self.sil == 'sil' or self.sil == 'replay':
+        if self.sil == "sil" or self.sil == "replay":
             # Let everyone in the world know who has which full trajectory
             owned_by_world = self.get_traj_owners(self.archive.cell_trajectory_manager.cell_trajectories)
 
@@ -208,19 +210,21 @@ class Explore:
         self.frames_compute += sum(global_frames)
 
         self.archive.frame_skip = self.trajectory_gatherer.frame_skip
-        self.archive.frames = prev_frames + sum(global_frames[0:hvd.rank()])
-        self.archive.update(mb_data,
-                            self.trajectory_gatherer.return_goals_chosen,
-                            self.trajectory_gatherer.return_goals_reached,
-                            self.trajectory_gatherer.sub_goals,
-                            self.trajectory_gatherer.ent_incs)
+        self.archive.frames = prev_frames + sum(global_frames[0 : hvd.rank()])
+        self.archive.update(
+            mb_data,
+            self.trajectory_gatherer.return_goals_chosen,
+            self.trajectory_gatherer.return_goals_reached,
+            self.trajectory_gatherer.sub_goals,
+            self.trajectory_gatherer.ent_incs,
+        )
 
         self._sync_info()
         cell_selector = self.archive.cell_selector
         trajectory_manager = self.archive.cell_trajectory_manager
         trajectory_manager.traj_prob_dict = cell_selector.get_traj_probabilities_dict(self.archive.archive)
 
-        if self.sil == 'sil' or self.sil == 'replay':
+        if self.sil == "sil" or self.sil == "replay":
             traj_candidates = []
 
             # Select a trajectory to imitate based on the current cell-selection procedure
@@ -244,7 +248,7 @@ class Explore:
             # If we do not have our own trajectory, and our environment is ready for the next demonstration, make a
             # request for our trajectory
             env_zero = self.trajectory_gatherer.env.get_envs()[0]
-            if owner != hvd.rank() and env_zero.recursive_getattr('sil_ready_for_next'):
+            if owner != hvd.rank() and env_zero.recursive_getattr("sil_ready_for_next"):
                 request = (hvd.rank(), cell_traj_id, owner)
             else:
                 request = (hvd.rank(), None, None)
@@ -256,17 +260,17 @@ class Explore:
 
             # If we still do not have a trajectory to imitate, stop imitation learning
             if len(traj_candidates) == 0:
-                env_zero.recursive_call_method('set_sil_trajectory', [None, None])
+                env_zero.recursive_call_method("set_sil_trajectory", [None, None])
                 self.prev_selected_traj = None
                 self.prev_selected_traj_len = 0
             else:
                 selected_traj, cell_traj_end, selected_traj_score, selected_traj_len = traj_candidates[-1]
-                if env_zero.recursive_getattr('sil_ready_for_next') and \
-                        (self.prev_selected_traj != selected_traj or self.prev_selected_traj_len < selected_traj_len):
-                    cell_trajectory = trajectory_manager.get_trajectory(selected_traj, -1,
-                                                                        self.archive.cell_id_to_key_dict)
+                if env_zero.recursive_getattr("sil_ready_for_next") and (
+                    self.prev_selected_traj != selected_traj or self.prev_selected_traj_len < selected_traj_len
+                ):
+                    cell_trajectory = trajectory_manager.get_trajectory(selected_traj, -1, self.archive.cell_id_to_key_dict)
                     frame_trajectory = trajectory_manager.get_full_trajectory(cell_traj_id, cell_traj_end)
-                    env_zero.recursive_call_method('set_sil_trajectory', (frame_trajectory, cell_trajectory))
+                    env_zero.recursive_call_method("set_sil_trajectory", (frame_trajectory, cell_trajectory))
                     self.prev_selected_traj = selected_traj
                     self.prev_selected_traj_len = selected_traj_len
 

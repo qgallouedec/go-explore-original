@@ -14,8 +14,10 @@ def init_mpi():
     global COMM_WORLD
     global COMM_TYPE_SHARED
     import mpi4py.rc
+
     mpi4py.rc.initialize = False
     from mpi4py import MPI
+
     COMM_WORLD = MPI.COMM_WORLD
     COMM_TYPE_SHARED = MPI.COMM_TYPE_SHARED
 

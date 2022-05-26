@@ -6,17 +6,18 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import cv2
 import copy
-import numpy as np
-import matplotlib.pyplot as plt
-from typing import Tuple, Any
 from collections import defaultdict
+from typing import Any, Tuple
+
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 from atari_reset.atari_reset.wrappers import MyWrapper
 
 
 class PitfallPosLevel:
-    __slots__ = ['level', 'score', 'room', 'x', 'y', 'tuple']
+    __slots__ = ["level", "score", "room", "x", "y", "tuple"]
 
     # noinspection PyUnusedLocal
     def __init__(self, level, score, room, x, y):
@@ -83,21 +84,18 @@ class MyPitfall(MyWrapper):
     treasure_collected_threshold = 100
     game_screen_height = screen_height - gui_size
     nb_rooms = 255
-    attr_max = {'treasures': 32,
-                'room': nb_rooms}
+    attr_max = {"treasures": 32, "room": nb_rooms}
 
     @staticmethod
     def get_attr_max(name):
-        if name == 'x':
+        if name == "x":
             return MyPitfall.screen_width * MyPitfall.x_repeat
-        elif name == 'y':
+        elif name == "y":
             return MyPitfall.game_screen_height
         else:
             return MyPitfall.attr_max[name]
 
-    def __init__(self,
-                 env: Any,
-                 cell_representation: Any = None):
+    def __init__(self, env: Any, cell_representation: Any = None):
         super(MyPitfall, self).__init__(env)
         self.env.reset()
         self.ram = None
@@ -136,14 +134,14 @@ class MyPitfall(MyWrapper):
         self.treasures = 0
         self.done = 0
         if self.room not in self.rooms:
-            self.rooms[self.room] = (True, unprocessed_state[MyPitfall.gui_size:].repeat(self.x_repeat, axis=1))
+            self.rooms[self.room] = (True, unprocessed_state[MyPitfall.gui_size :].repeat(self.x_repeat, axis=1))
         self.room_time = (self.room, 0)
         return unprocessed_state
 
     def pos_from_unprocessed_state(self, face_pixels):
         face_pixels = [(y, x * self.x_repeat) for y, x in face_pixels]
         if len(face_pixels) == 0:
-            assert self.pos is not None, 'No face pixel and no previous pos'
+            assert self.pos is not None, "No face pixel and no previous pos"
             return self.pos  # Simply re-use the same position
         y, x = np.mean(face_pixels, axis=0)
         room = 0
@@ -153,7 +151,7 @@ class MyPitfall(MyWrapper):
             if y < MyPitfall.ground_y:
                 room = (self.room + direction_x) % MyPitfall.nb_rooms
             else:
-                room = (self.room + direction_x*3) % MyPitfall.nb_rooms
+                room = (self.room + direction_x * 3) % MyPitfall.nb_rooms
 
         self.room = room
         self.x = x
@@ -184,7 +182,7 @@ class MyPitfall(MyWrapper):
         return copy.copy(self.state)
 
     def get_face_pixels(self, unprocessed_state):
-        result = set(zip(*np.where(unprocessed_state[MyPitfall.gui_size:, :, 0] == 228)))
+        result = set(zip(*np.where(unprocessed_state[MyPitfall.gui_size :, :, 0] == 228)))
         return result
 
     def step(self, action) -> Tuple[np.ndarray, float, bool, dict]:
@@ -203,7 +201,7 @@ class MyPitfall(MyWrapper):
             self.room_time = (self.room, 0)
         self.room_time = (self.room, self.room_time[1] + 1)
         if self.room not in self.rooms:
-            self.rooms[self.room] = (True, unprocessed_state[MyPitfall.gui_size:].repeat(self.x_repeat, axis=1))
+            self.rooms[self.room] = (True, unprocessed_state[MyPitfall.gui_size :].repeat(self.x_repeat, axis=1))
 
         if reward >= MyPitfall.treasure_collected_threshold:
             self.treasures += 1
@@ -224,8 +222,18 @@ class MyPitfall(MyWrapper):
         return self.pos
 
     # noinspection PyUnusedLocal
-    def render_with_known(self, known_positions, x_res, y_res, show=False, filename=None, combine_val=max,
-                          get_val=lambda x: x.score, minmax=None, log_scale=False):
+    def render_with_known(
+        self,
+        known_positions,
+        x_res,
+        y_res,
+        show=False,
+        filename=None,
+        combine_val=max,
+        get_val=lambda x: x.score,
+        minmax=None,
+        log_scale=False,
+    ):
         height, width = list(self.rooms.values())[0][1].shape[:2]
 
         final_image = np.zeros((height * 22, width * 12, 3), dtype=np.uint8) + MyPitfall.nb_rooms
@@ -246,7 +254,7 @@ class MyPitfall(MyWrapper):
             y_room, x_room = room_pos(room)
             y_room *= height
             x_room *= width
-            final_image[y_room:y_room + height, x_room:x_room + width, :] = img
+            final_image[y_room : y_room + height, x_room : x_room + width, :] = img
 
         plt.figure(figsize=(final_image.shape[1] // 40, final_image.shape[0] // 40))
 
@@ -262,10 +270,20 @@ class MyPitfall(MyWrapper):
 
             cv2.line(final_image, (x_room, y_room), (x_room, y_room + img.shape[0]), (255, 255, 255), 1)
             cv2.line(final_image, (x_room, y_room), (x_room + img.shape[1], y_room), (255, 255, 255), 1)
-            cv2.line(final_image, (x_room + img.shape[1], y_room), (x_room + img.shape[1], y_room + img.shape[0]),
-                     (255, 255, 255), 1)
-            cv2.line(final_image, (x_room, y_room + img.shape[0]), (x_room + img.shape[1], y_room + img.shape[0]),
-                     (255, 255, 255), 1)
+            cv2.line(
+                final_image,
+                (x_room + img.shape[1], y_room),
+                (x_room + img.shape[1], y_room + img.shape[0]),
+                (255, 255, 255),
+                1,
+            )
+            cv2.line(
+                final_image,
+                (x_room, y_room + img.shape[0]),
+                (x_room + img.shape[1], y_room + img.shape[0]),
+                (255, 255, 255),
+                1,
+            )
 
             for k in known_positions:
                 if k.room != room:
@@ -281,21 +299,29 @@ class MyPitfall(MyWrapper):
 
         vals = list(points.values())
         points = list(points.items())
-        plt.scatter([p[0][0] for p in points], [p[0][1] for p in points], c=[p[1] for p in points], cmap='bwr',
-                    s=x_res ** 2, marker='*')
+        plt.scatter(
+            [p[0][0] for p in points],
+            [p[0][1] for p in points],
+            c=[p[1] for p in points],
+            cmap="bwr",
+            s=x_res**2,
+            marker="*",
+        )
         plt.legend()
 
         import matplotlib.cm
         import matplotlib.colors
-        mappable = matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(vmin=np.min(vals), vmax=np.max(vals)),
-                                                cmap='bwr')
+
+        mappable = matplotlib.cm.ScalarMappable(
+            norm=matplotlib.colors.Normalize(vmin=np.min(vals), vmax=np.max(vals)), cmap="bwr"
+        )
         mappable.set_array(np.array(vals))
-        matplotlib.rcParams.update({'font.size': 50})
+        matplotlib.rcParams.update({"font.size": 50})
         plt.colorbar(mappable, fraction=0.043, pad=0.01)
 
-        plt.axis('off')
+        plt.axis("off")
         if filename is not None:
-            plt.savefig(filename, bbox_inches='tight')
+            plt.savefig(filename, bbox_inches="tight")
         if show:
             plt.show()
         else:
@@ -321,9 +347,11 @@ class MyPitfall(MyWrapper):
         if MyPitfall.TARGET_SHAPE is None:
             return None
         import cv2
-        return ((cv2.resize(
-            cv2.cvtColor(state, cv2.COLOR_RGB2GRAY), MyPitfall.TARGET_SHAPE, interpolation=cv2.INTER_AREA) / 255.0) *
-                MyPitfall.MAX_PIX_VALUE).astype(np.uint8)
+
+        return (
+            (cv2.resize(cv2.cvtColor(state, cv2.COLOR_RGB2GRAY), MyPitfall.TARGET_SHAPE, interpolation=cv2.INTER_AREA) / 255.0)
+            * MyPitfall.MAX_PIX_VALUE
+        ).astype(np.uint8)
 
     def __getstate__(self):
         return self.__dict__

@@ -6,13 +6,14 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import time
-import random
-import numpy as np
-import os
 import glob
 import hashlib
+import os
+import random
+import time
 from contextlib import contextmanager
+
+import numpy as np
 
 
 class TimedPickle:
@@ -27,7 +28,7 @@ class TimedPickle:
     def __setstate__(self, s):
         tstart, self.data, self.name, self.enabled = s
         if self.enabled:
-            print(f'pickle time for {self.name} = {time.time() - tstart} seconds')
+            print(f"pickle time for {self.name} = {time.time() - tstart} seconds")
 
 
 @contextmanager
@@ -52,17 +53,17 @@ def use_seed(seed):
 
 def get_code_hash():
     cur_dir = os.path.dirname(os.path.realpath(__file__))
-    all_code = ''
-    for f in sorted(glob.glob(cur_dir + '**/*.py', recursive=True)):
+    all_code = ""
+    for f in sorted(glob.glob(cur_dir + "**/*.py", recursive=True)):
         # We assume all whitespace is irrelevant, as well as comments
         with open(f) as fh:
             for line in fh:
-                line = line.partition('#')[0]
+                line = line.partition("#")[0]
                 line = line.rstrip()
 
-                all_code += ''.join(line.split())
+                all_code += "".join(line.split())
 
-    code_hash = hashlib.sha256(all_code.encode('utf8')).hexdigest()
+    code_hash = hashlib.sha256(all_code.encode("utf8")).hexdigest()
 
     return code_hash
 
